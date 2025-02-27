@@ -336,8 +336,8 @@
 
   {#-####################################################################-#}
   {#- Output result as a string formatted as JSON - this can then be parsed by whatever called the macro -#}
-  {%- set FinalCheapDict     = dict(price=none) if resultCheap.pricing     == -1 or resultCheap.priceStartTime    ==None else dict(startTime =resultCheap.priceStartTime     | as_datetime | as_local | string, price = resultCheap.pricing     | round(6)) -%}
-  {%- set FinalExpensiveDict = dict(price=none) if resultExpensive.pricing == -1 or resultExpensive.priceStartTime==None else dict(starttime =resultExpensive.priceStartTime | as_datetime | as_local | string, price = resultExpensive.pricing | round(6)) -%}
+  {%- set FinalCheapDict     = dict(price=none) if resultCheap.pricing     == -1 or resultCheap.priceStartTime    ==None else dict(startTime =resultCheap.priceStartTime     | as_datetime | as_local | string, endTime =(resultCheap.priceStartTime + durationMinutes*60)     | as_datetime | as_local | string, price = resultCheap.pricing     | round(6)) -%}
+  {%- set FinalExpensiveDict = dict(price=none) if resultExpensive.pricing == -1 or resultExpensive.priceStartTime==None else dict(starttime =resultExpensive.priceStartTime | as_datetime | as_local | string, endTime =(resultExpensive.priceStartTime + durationMinutes*60) | as_datetime | as_local | string, price = resultExpensive.pricing | round(6)) -%}
   {%- if (FinalCheapDict.price is none or FinalExpensiveDict.price is none) and status=="ok" -%}
     {%- set status="noWindowFound" -%}
   {%- endif -%}
@@ -364,17 +364,17 @@
   {%- if mode == "cheapprice" -%}
     {{- result.cheap.price -}}
   {%- elif mode == "cheapstart" -%}
-    {{- result.cheap.startTime  | as_datetime if result.price != none else none -}}
+    {{- result.cheap.startTime | as_datetime if result.price != none else none -}}
   {%- elif mode == "cheapend" -%}
-    {{- (result.cheap.startTime | as_datetime + 60 * result.duration) if result.price != none else none -}}
+    {{- (result.cheap.endTime | as_datetime if result.price != none else none -}}
   {%- elif mode == "ischeapnow" -%}
     {{- result.cheap.isCheapNow -}}
   {%- elif mode == "expensiveprice" -%}
     {{- result.expensive.price -}}
   {%- elif mode == "expensivestart" -%}
-    {{- result.expensive.starttime  | as_datetime if result.price != none else none -}}
+    {{- result.expensive.startTime | as_datetime if result.price != none else none -}}
   {%- elif mode == "expensiveend" -%}
-    {{- (result.expensive.starttime | as_datetime + 60 * result.duration) if result.price != none else none -}}
+    {{- (result.expensive.endTime | as_datetime if result.price != none else none -}}
   {%- elif mode == "isexpensivenow" -%}
     {{- result.expensive.isExpensiveNow -}}
   {%- else -%}
