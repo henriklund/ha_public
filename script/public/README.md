@@ -200,3 +200,8 @@ The last example can be extended by using additional integrations (e.g. Nordpool
     - If mySensor_xxxxxx is a dict, please check for proper formatting and naming. Cross check with the actual sensor (using Developer Tools -> States in Home Assistant).
     - Has _latestDatetime_ been passed when using _mode=strict_? If so, either change _latestDatetime_ or change _mode_ to a different setting
     - Are the sensors missing day-ahead for tomorrow, and is time so close to midnight that duration is longer than time until midnight? If so, either decrease duration or see attempt to rectify the missing day-ahead information
+
+
+# day-ahead_fallback.snip
+Template for a sensor to be added to configuration.yaml. Sensor will allow fallback between the Home Assistant integrations Energi Data Service -> Strømligning -> Nordpool in case the day-ahead prices are not updated. Please note that there is no validation of the suitability of the data from each integration (that is the responisibility of the integration) nor is there any handling of missing information (i.e. forecast info when using Strømigning / Nordpool or tarifs when using Nordpool).<br/>
+The template can be extended with other integrations if so needed.
