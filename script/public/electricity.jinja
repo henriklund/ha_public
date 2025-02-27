@@ -336,9 +336,9 @@
 
   {#-####################################################################-#}
   {#- Output result as a string formatted as JSON - this can then be parsed by whatever called the macro -#}
-  {%- set FinalCheapDict     = dict(cheapPrice=none)     if resultCheap.pricing     == -1 or resultCheap.priceStartTime    ==None else dict(cheapPriceStartTime    =resultCheap.priceStartTime    | as_datetime | as_local | string, cheapPrice    =resultCheap.pricing    |round(6)) -%}
-  {%- set FinalExpensiveDict = dict(expensivePrice=none) if resultExpensive.pricing == -1 or resultExpensive.priceStartTime==None else dict(expensivePriceStartTime=resultExpensive.priceStartTime| as_datetime | as_local | string, expensivePrice=resultExpensive.pricing|round(6)) -%}
-  {%- if (FinalCheapDict.cheapPrice is none or FinalExpensiveDict.expensivePrice is none) and status=="ok" -%}
+  {%- set FinalCheapDict     = dict(price=none) if resultCheap.pricing     == -1 or resultCheap.priceStartTime    ==None else dict(startTime =resultCheap.priceStartTime     | as_datetime | as_local | string, price = resultCheap.pricing     | round(6)) -%}
+  {%- set FinalExpensiveDict = dict(price=none) if resultExpensive.pricing == -1 or resultExpensive.priceStartTime==None else dict(starttime =resultExpensive.priceStartTime | as_datetime | as_local | string, price = resultExpensive.pricing | round(6)) -%}
+  {%- if (FinalCheapDict.price is none or FinalExpensiveDict.price is none) and status=="ok" -%}
     {%- set status="noWindowFound" -%}
   {%- endif -%}
 
@@ -353,8 +353,8 @@
                                (dict(check=validate.check).items() | list +
                                  ([] if validate.check=="ok" else dict(kept=validate.idx, lastGood=(none if validate.lastGood==None else validate.lastGood.myStart | as_datetime | as_local) | string, invalid=(none if validate.this==None else validate.this.myStart | as_datetime | as_local) | string).items() | list)))) %}
   {%- set result = dict(  window         = dict(resultWindow.items()       | list + ([] if mode != "details" else resultDetails.items()                                | list)),
-                          cheap          = dict(FinalCheapDict.items()     | list + ([] if mode != "details" else dict(cheapWindow=resultCheap.window).items()         | list) + dict(isCheapNow      = none if FinalCheapDict.cheapPrice        ==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalCheapDict.cheapPriceStartTime         | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
-                          expensive      = dict(FinalExpensiveDict.items() | list + ([] if mode != "details" else dict(expensiveWindow=resultExpensive.window).items() | list) + dict(isExpensiveNow  = none if FinalExpensiveDict.expensivePrice==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalExpensiveDict.expensivePriceStartTime | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
+                          cheap          = dict(FinalCheapDict.items()     | list + ([] if mode != "details" else dict(window=resultCheap.window).items()         | list) + dict(isCheapNow      = none if FinalCheapDict.price        ==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalCheapDict.startTime         | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
+                          expensive      = dict(FinalExpensiveDict.items() | list + ([] if mode != "details" else dict(window=resultExpensive.window).items() | list) + dict(isExpensiveNow  = none if FinalExpensiveDict.price==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalExpensiveDict.starttime | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
                           mode           = mode,
                           dataValidation = validateResult,
                           status         = status ) %}
@@ -362,21 +362,21 @@
                         (dict() if hint == "" else dict(hint = hint)).items() | list ) -%}                      
                       
   {%- if mode == "cheapprice" -%}
-    {{- result.cheapPrice -}}
+    {{- result.cheap.price -}}
   {%- elif mode == "cheapstart" -%}
-    {{- result.cheapPriceStartTime  | as_datetime if result.cheapPrice != none else none -}}
+    {{- result.cheap.startTime  | as_datetime if result.price != none else none -}}
   {%- elif mode == "cheapend" -%}
-    {{- (result.cheapPriceStartTime | as_datetime + 60 * result.duration) if result.cheapPrice != none else none -}}
+    {{- (result.cheap.startTime | as_datetime + 60 * result.duration) if result.price != none else none -}}
   {%- elif mode == "ischeapnow" -%}
-    {{- result.isCheapNow -}}
+    {{- result.cheap.isCheapNow -}}
   {%- elif mode == "expensiveprice" -%}
-    {{- result.expensivePrice -}}
+    {{- result.expensive.price -}}
   {%- elif mode == "expensivestart" -%}
-    {{- result.expensivePriceStartTime  | as_datetime if result.expensivePrice != none else none -}}
+    {{- result.expensive.starttime  | as_datetime if result.price != none else none -}}
   {%- elif mode == "expensiveend" -%}
-    {{- (result.expensivePriceStartTime | as_datetime + 60 * result.duration) if result.expensivePrice != none else none -}}
+    {{- (result.expensive.starttime | as_datetime + 60 * result.duration) if result.price != none else none -}}
   {%- elif mode == "isexpensivenow" -%}
-    {{- result.isExpensiveNow -}}
+    {{- result.expensive.isExpensiveNow -}}
   {%- else -%}
     {{- result | to_json -}}
   {%- endif -%}
