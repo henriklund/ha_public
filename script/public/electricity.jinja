@@ -2,7 +2,7 @@
                       mySensor_tomorrow = mySensor_today if mySensor_today is string else dict(),
                       mySensor_forecast = mySensor_today if mySensor_today is string else dict(),
                       earliestDatetime = null, latestDatetime=null,
-                      durationTimedelta = 60,
+                      duration = 60,
                       returnFirstBool = true,
                       timeAdherence = "default",
                       mode = "default",
@@ -13,14 +13,14 @@
                     ) -%}
 
 {# Constants #}
-{% set defaultDurationMinNum = 30 %}
-{% set defaultPeriodHrsNum=48 %}
+{% set defaultDurationMinNum = 5 %}
+{% set defaultPeriodHrsNum   = 24 %}
 
   {#-####################################################################-#}
   {#-
     Note that macro can be called adding just the mySensor_today parameter. Any parameter can be added in any order
     providing that it is written using the parameter name. When leaving out parameters, this is mandatory to ensure
-    correct parsing. E.g. {{- PeriodPrice("sensor.edssensor", durationTimedelta=timedelta(minutes=90)) -}} 
+    correct parsing. E.g. {{- PeriodPrice("sensor.edssensor", duration=timedelta(minutes=90)) -}} 
 
     Required = *
     * mySensor_today        (dic | string) if dict, expected to contain DATA (list of paired time + price), and the names of the pairs in
@@ -28,7 +28,7 @@
                             will collect data and assume that timeTag / priceTag equal defaults
     edsearliestDatetime     (DateTime) Exact date/time of start of window during which electricity will be used
     latestDatetime          (DateTime) Exact date/time of end of window during which electricity will be used
-    durationTimedelta       (Integer) Duration of electricity usage in minutes
+    duration       (Integer) Duration of electricity usage in minutes
     returnFirstBool         (Boolean) Default to true to use first occurrence of the lowest price, otherwise use the last
     timeAdherence           (String) Influences the behaviour when seeking low / high cost
                             - default = adjusts time (start / end) to 'now' if time is in the past
@@ -208,11 +208,11 @@
     {%- endif -%}
   {%- endif -%}
   
-  {#- Validate and set durationTimedelta -#}
-  {%- set minDuration            = defaultDurationMinNum if defaultDuration is number else 30 -%}
-  {%- set durationTimedelta      = (durationTimedelta.seconds // 60) if durationTimedelta is not number and durationTimedelta.total_seconds() is defined else durationTimedelta -%}
-  {%- set durationTimedelta      = (minDuration * 60) if durationTimedelta is not defined or (durationTimedelta | int != durationTimedelta) or durationTimedelta < minDuration else (durationTimedelta * 60)-%}
-  {%- set durationMinutes        = durationTimedelta | int(minDuration * priceWindow) // 60 -%}
+  {#- Validate and set duration -#}
+  {%- set minDuration            = defaultDurationMinNum if defaultDuration is number else defaultDurationMinNum -%}
+  {%- set duration               = (duration.seconds // 60) if duration is not number and duration.total_seconds() is defined else duration -%}
+  {%- set duration               = (minDuration * 60) if duration is not defined or (duration | int != duration) or duration < minDuration else (duration * 60)-%}
+  {%- set durationMinutes        = duration | int(minDuration * priceWindow) // 60 -%}
   {%- set durationMinutesResidual= durationMinutes % priceWindow -%}
   {%- set durationUnits          = ((durationMinutes // priceWindow) + (1 if durationMinutesResidual > 0 else 0)) | int -%}
 
@@ -259,7 +259,7 @@
 
   {#-###################################-#}
   {#- Validate and set latestDatetime -#}
-  {%- set defPeriodeHours        = defaultPeriodHrsNum if defaultPeriodHrsNum is number else 48 -%}
+  {%- set defPeriodeHours        = defaultPeriodHrsNum if defaultPeriodHrsNum is number else defaultPeriodHrsNum -%}
   {%- set latestDatetime         = nowTime + timedelta(hours=defPeriodeHours) if latestDatetime is not defined or latestDatetime is not datetime or latestDatetime | as_timestamp < earliestDatetime else latestDatetime -%}
   {#- Strip microseconds from time -#}
   {%- set latestDatetimeMinut    = latestDatetime.minute -%}
