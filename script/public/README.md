@@ -37,27 +37,17 @@ When mode is default or details, the returned value (passed throught the from_js
 "*" = only included if a corresponding period was found
 | Parameter | Description |
 |-----------|-------------|
-| * cheapPriceStartTime      | Datetime string of when cheapest time starts|
-| * cheapPriceEndTime        | Datetime string of when cheapest time ends |
-| cheapPrice                 | Price if 1 kW is used each hour during cheapest time. None if no period found |
-| * expensivePriceStartTime  | Datetime string of when most expensive time starts |
-| * expensivePriceEndTime    | Datetime string of when most expensive time ends |
-| expensivePrice             | Price if 1 kW is used each hour during most expensive time. None if no period found |
-| earliestDatetime           | Datetime string of the earliest time used when looking for cheap / expensive |
-| latestDatetime             | Datetime string of the latest time used when looking for cheap / expensive |
-| duration                   | The duration of the time window looked for (in minutes) |
-| isCheapNow                 | none if no cheap time period found, otherwise true / false dependent on whether right now is the cheapest period |
-| isExpensiveNow             | none if no expensive time period found, otherwise true / false dependent on whether right now is the most expensive period |
+| cheap / expensive          | JSON containing information relating to cheapest / most expensive period. Each contain:<br/>* **startTime**: Datetime string of when time starts<br/>* **endTime**: Datetime string of when time ends<br/>**price**: Price if 1 (or the under kwh_usage mentioned) kWh is used for the duration. None if no period found<br/>**isCheapNow**/**isExpensiveNow**: none if no cheap/expensive time period found, otherwise true / false dependent on whether right now is the cheapest/most expensive period |
+| window                     | JSON containing information relating to used window:<br/>**earliestDatetime**: Datetime string of the earliest time used when looking for cheap / expensive<br/>**latestDatetime**: Datetime string of the latest time used when looking for cheap / expensive<br/>**duration**: The duration of the time window looked for (in minutes) |
 | mode                       | Name of the mode used |
 | status                     | Result of the operation. If not 'ok', then this is an warning / error |
 | hint                       | none or string as provided when  macro was called |
 
-If mode is details, follwing data will also be available
+If mode is details, follwing data will also be available under the relevant JSONs
 | Parameter | Description |
 |-----------|-------------|
-| cheapWindow                | Explaination for calculation to reach cheapest price.<br/>Set of [{ start, minutes, kWh_price, est_kWh },...] covering the whole duration. Start defines when each subset starts, length in minutes of the subset, kWh_price is the corresponding price and est_kWh is the kWh part of the corresponding slice. kWh_price * est_kWh is the estimated cost for the slice.|
-| expensiveWindow            | Explaination for calculation to reach most expensive price.<br/>Set of [{ start, minutes, kWh_price, est_kWh },...] covering the whole duration. Start defines when each subset starts, length in minutes of the subset, kWh_price is the corresponding price and est_kWh is the kWh part of the corresponding slice. kWh_price * est_kWh is the estimated cost for the slice.|
-|validate                    | JSON with following possible fields:<br/>**validationMode** = Lower case version of _validateData_<br/>**check**          = Status of last validation<br/>**kept**           = Number of kept records<br/>**lastGood**       = Last good record<br/>**invalid**        = First bad record
+| window                | <ins>Under cheap/expensive JSON</ins><br/>Explaination for calculation to reach price.<br/>Set of [{ start, minutes, kWh_price, est_kWh },...] covering the whole duration. Start defines when each subset starts, length in minutes of the subset, kWh_price is the corresponding price and est_kWh is the kWh part of the corresponding slice. kWh_price * est_kWh is the estimated cost for the slice.|
+|validate                    | <ins>Under window JSON</ins><br/>JSON with following possible fields:<br/>**validationMode** = Lower case version of _validateData_<br/>**check**          = Status of last validation<br/>**kept**           = Number of kept records<br/>**lastGood**       = Last good record<br/>**invalid**        = First bad record
 <br/>
 <br/>
 For any other mode, the returned value will be a string with the following content:
