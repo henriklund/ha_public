@@ -20,66 +20,10 @@
   {#-
     Note that macro can be called adding just the mySensor_today parameter. Any parameter can be added in any order
     providing that it is written using the parameter name. When leaving out parameters, this is mandatory to ensure
-    correct parsing. E.g. {{- PeriodPrice("sensor.edssensor", duration=timedelta(minutes=90)) -}} 
+    correct parsing. E.g. {{- PeriodPrice("sensor.edssensor", duration=timedelta(minutes=90)) -}}
 
-    Required = *
-    * mySensor_today        (dic | string) if dict, expected to contain DATA (list of paired time + price), and the names of the pairs in
-                            timeTag / priceTag. If timeTag / priceTag is omitted, macro will try to guess. If a string is supplied, macro
-                            will collect data and assume that timeTag / priceTag equal defaults
-    edsearliestDatetime     (DateTime) Exact date/time of start of window during which electricity will be used
-    latestDatetime          (DateTime) Exact date/time of end of window during which electricity will be used
-    duration       (Integer) Duration of electricity usage in minutes
-    returnFirstBool         (Boolean) Default to true to use first occurrence of the lowest price, otherwise use the last
-    timeAdherence           (String) Influences the behaviour when seeking low / high cost
-                            - default = adjusts time (start / end) to 'now' if time is in the past
-                            - strict  = do not adjust (start / end) time and return empty result if window is in the past
-                            - forced  = do not adjust (start / end) time and return result even if window is in the past
-    defaultDurationMinNum   (Number) Default minimum duration of a 
-    defaultPeriodHrsNum     (Number) The default duration of hour to look for cheapest prices
-    mode                    full / 
-                            cheapPrice / cheapStart / cheapStart / isCheapNow
-                            expensivePrice / expensiveStart / expensiveStart / isExpensiveNow
-    hint                    String to be returned as part of the result. This could (e.g.) be the name of the integration providing data
-    usageWindow             Number (1-60) of minutes of the length of each the each of kwh_usage items
-    kwh_usage               Either a List [] of numbers  or a single number. This is a representation of the expected kWh used. 
-    validateData            Allows validation of price data. A valid check means that all dates in today / tomorrow / forecast are
-                            space at the same intervals, and that the intervals today -> tomorrow and tomorrow -> forecast are spaced 
-                            at this interval as well
-                            - ignore      = do not validate data
-                            - prune       = detect error and keep only valid data
-                            - stopOnError = detect error and stop processing if any found
-
-    Macro returns a STRING(!) based on the MODE setting
-    mode = full
-      String that must be converted using the from_json filter. The JSON can contain following:
-        * cheapPriceStartTime      Datetime string of when cheapest time starts
-        * cheapPriceEndTime        Datetime string of when cheapest time ends
-        cheapPrice                 Price if 1 kW is used each hour during cheapest time. None if no leftInPriceWindow found
-        * expensivePriceStartTime  Datetime string of when most expensive time starts
-        * expensivePriceEndTime    Datetime string of when most expensive time ends
-        expensivePrice             Price if 1 kW is used each hour during most expensive time. None if no leftInPriceWindow found
-        earliestDatetime           Datetime string of the earliest time used when looking for cheap / expensive
-        latestDatetime             Datetime string of the latest time used when looking for cheap / expensive
-        duration                   The duration of the time window looked for (in minutes)
-        isCheapNow                 none if no cheap time leftInPriceWindow found, otherwise true / false dependent on whether right now is the cheapest leftInPriceWindow 
-        isExpensiveNow             none if no expensive time leftInPriceWindow found, otherwise true / false dependent on whether right now is the most expensive leftInPriceWindow
-        hint                       none or string as provided when  macro was called 
-        status                     Status of the call
-        * = only included if a corresponding leftInPriceWindow was found
-    mode = cheapPrice
-      String value of price if 1 kW is used each hour during cheapest time. None if no leftInPriceWindow found
-    mode = cheapStart
-      Datetime string of when cheapest time starts
-    mode = cheapEnd
-      Datetime string of when cheapest time ends
-    mode = expensivePrice
-      String value of price if 1 kW is used each hour during most expensive time. None if no leftInPriceWindow found
-    mode = expensiveStart
-      Datetime string of when most expensive time starts
-    mode = expensiveEnd
-      Datetime string of when most expensive time ends
+    Documentation can be found here: https://github.com/henriklund/ha_public/blob/main/script/public/README.md#electricityjinja
   -#}
-
   {#-####################################################################-#}
     {%- macro LoadSensor(data, timeTag=none, priceTag=none) -%}
       {%- set datePrice = namespace(dateTag=none, date = none, priceTag=none, price = none) -%}
