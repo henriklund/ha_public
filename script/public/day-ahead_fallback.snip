@@ -1,0 +1,101 @@
+template:
+  - trigger:
+      - trigger: state
+        entity_id: sensor.andel_spot
+      - trigger: state
+        entity_id: sensor.stromligning_current_price_vat
+      - trigger: state
+        entity_id: binary_sensor.stromligning_tomorrow_available_vat
+      - trigger: state
+        entity_id: sensor.nordpool_kwh_dk2_dkk_6_095_025
+      - trigger: homeassistant
+        event: start
+    action:
+      variables:
+        result: >-
+          {%- set edsSensor         = "sensor.energi_data_service" %}
+          {%- set slSensorToday     = "sensor.stromligning_current_price_vat" %}
+          {%- set slSensorTomorrow  = "binary_sensor.stromligning_tomorrow_available_vat" %}
+          {%- set npSensor          = "sensor.nordpool_sensor" %}
+
+          {%- set edsRawTomorrow = state_attr(edsSensor, "raw_tomorrow") or [] -%}
+          {%- set slRawTomorrow = [] if not (states(slSensorTomorrow) | bool(false)) else state_attr(slSensorTomorrow, "prices") or [] -%}
+          {%- set npRawTomorrow = state_attr(npSensor, "raw_tomorrow") or [] -%}
+
+          {%- set type = -1 -%}
+          {%- if npRawTomorrow != [] and npRawTomorrow | length >= edsRawTomorrow | length and npRawTomorrow | length >= slRawTomorrow | length -%}
+            {%- set type = 2 -%}
+          {%- endif -%}
+          {%- if slRawTomorrow != [] and slRawTomorrow | length >= edsRawTomorrow | length and slRawTomorrow | length >= npRawTomorrow | length-%}
+            {%- set type = 1 -%}
+          {%- endif -%}
+          {%- if edsRawTomorrow != [] and edsRawResult | length >= slRawTomorrow.list | length and edsRawTomorrow | length >= npRawTomorrow | length-%}
+            {%- set type = 0 -%}
+          {%- endif -%}
+
+          {% set resultToday = namespace(list=[]) %}
+          {% set resultTomorrow = namespace(list=[]) %}
+          {% set resultForecast = namespace(list=[]) %}
+          
+          {%- if type == 0 -%}
+            {%- for item in (state_attr(edsSensor, "raw_today") or []) -%}
+                {% set resultToday.list = resultToday.list + [{'hour': item.hour | string, 'price': item.price}] -%}
+            {%- endfor -%}
+
+            {%- for item in (state_attr(edsSensor, "raw_tomorrow") or []) -%}
+                {% set resultTomorrow.list = resultTomorrow.list + [{'hour': item.hour | string, 'price': item.price}] -%}
+            {%- endfor -%}
+            
+            {%- for item in (state_attr(edsSensor, "forecast") or []) -%}
+                {% set resultForecast.list = resultForecast.list + [{'hour': item.hour | string, 'price': item.price}] -%}
+            {%- endfor -%}
+            
+            {%- set resultState = states(edsSensor) or none -%}
+            {%- set tomorrowValid = state_attr(edsSensor,"tomorrow_valid") -%}
+            {%- set source = "Energi Data Service" -%}
+          {%- elif type == 1 -%}
+            {%- for item in (state_attr(slSensorToday, "prices") or []) -%}
+                {% set resultToday.list = resultToday.list + [{'hour': item.start | string, 'price': item.price}] -%}
+            {%- endfor -%}
+          
+            {%- for item in slRawTomorrow -%}
+                {% set resultTomorrow.list = resultTomorrow.list + [{'hour': item.start | string, 'price': item.price}] -%}
+            {%- endfor -%}
+
+            {%- set resultState = states(slSensorToday) or none -%}
+            {%- set tomorrowValid = states(slSensorTomorrow) | bool -%}
+            {%- set source = "Strømligning" -%}
+          {%- elif type == 2 -%}
+            {%- for item in (state_attr(npSensor, "raw_today") or []) -%}
+                {% set resultToday.list = resultToday.list + [{'hour': item.start | string, 'price': item.value | float}] -%}
+            {%- endfor -%}
+            
+            {%- for item in npRawTomorrow -%}
+                {% set resultTomorrow.list = resultTomorrow.list + [{'hour': item.start | string, 'price': item.value | float}] -%}
+            {%- endfor -%}
+
+            {%- set resultState = states(npSensor) or none -%}
+            {%- set tomorrowValid = state_attr(npSensor,"tomorrow_valid") -%}
+            {%- set source = "Nordpool" -%}
+          {% else %}
+            {%- set resultState = none -%}
+            {%- set tomorrowValid = false -%}
+            {%- set source = "N/A" -%}
+          {%- endif -%}
+
+          {{ dict(state=resultState, source=source, tomorrowValid=tomorrowValid, raw_today=resultToday.list, raw_tomorrow=resultTomorrow.list, forecast=resultForecast.list) }}
+    sensor:
+      - name: "Combined day-ahead"
+        state: >-
+          {{ (result).state }}
+        attributes:
+          raw_today: "{{ (result).raw_today }}"
+          raw_tomorrow: "{{ (result).raw_tomorrow }}"
+          tomorrow_valid: "{{ (result).tomorrowValid }}"
+          forecast: "{{ (result).forecast }}"
+          source: "{{ (result).source }}"
+          today: "{{ (result).raw_today | map(attribute='price') | list }}"
+          tomorrow: "{{ [] if not (result).tomorrowValid | bool else (result).raw_tomorrow | map(attribute='price') | list }}"
+          unit_of_measurement: DKK/kWh
+          device_class: monetary
+          icon: mdi:cash
