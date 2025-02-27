@@ -237,8 +237,8 @@
   
   {#-####################################################################-#}
   {#- Set result name spaces -#}
-  {%- set resultCheap     = namespace(pricing=99999999, priceStartTime=None, window=[]) -%}
-  {%- set resultExpensive = namespace(pricing=0,    priceStartTime=None, window=[]) -%}
+  {%- set resultCheap     = namespace(pricing=99999999, priceStartTime=None, explain=[]) -%}
+  {%- set resultExpensive = namespace(pricing=0,    priceStartTime=None, explain=[]) -%}
 
   {#-####################################################################-#}
   {#- Only run if we have price data and no error so far -#}
@@ -319,7 +319,7 @@
                  ) and (priceStartTime + 60 * durationMinutes <= latestDatetime) -%}
             {%- set resultCheap.pricing        = pricing.value -%}
             {%- set resultCheap.priceStartTime = priceStartTime -%}
-            {%- set resultCheap.window         = timeSet.dict -%}
+            {%- set resultCheap.explain         = timeSet.dict -%}
           {%- endif -%}
           {%- if (pricing.value>resultExpensive.pricing or
                  (returnFirstBool and pricing.value>=resultExpensive.pricing and (resultExpensive.priceStartTime is none or priceStartTime<resultExpensive.priceStartTime)) or
@@ -327,7 +327,7 @@
                  ) and (priceStartTime + 60 * durationMinutes <= latestDatetime) -%}
             {%- set resultExpensive.pricing        = pricing.value -%}
             {%- set resultExpensive.priceStartTime = priceStartTime -%}
-            {%- set resultExpensive.window         = timeSet.dict -%}
+            {%- set resultExpensive.explain         = timeSet.dict -%}
           {%- endif -%}
         {%- endif -%}
       {%- endfor -%}
@@ -353,8 +353,8 @@
                                (dict(check=validate.check).items() | list +
                                  ([] if validate.check=="ok" else dict(kept=validate.idx, lastGood=(none if validate.lastGood==None else validate.lastGood.myStart | as_datetime | as_local) | string, invalid=(none if validate.this==None else validate.this.myStart | as_datetime | as_local) | string).items() | list)))) %}
   {%- set result = dict(  window         = dict(resultWindow.items()       | list + ([] if mode != "details" else resultDetails.items()                                | list)),
-                          cheap          = dict(FinalCheapDict.items()     | list + ([] if mode != "details" else dict(window=resultCheap.window).items()         | list) + dict(isCheapNow      = none if FinalCheapDict.price        ==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalCheapDict.startTime         | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
-                          expensive      = dict(FinalExpensiveDict.items() | list + ([] if mode != "details" else dict(window=resultExpensive.window).items() | list) + dict(isExpensiveNow  = none if FinalExpensiveDict.price==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalExpensiveDict.startTime | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
+                          cheap          = dict(FinalCheapDict.items()     | list + ([] if mode != "details" else dict(explain=resultCheap.explain).items()         | list) + dict(isCheapNow      = none if FinalCheapDict.price        ==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalCheapDict.startTime         | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
+                          expensive      = dict(FinalExpensiveDict.items() | list + ([] if mode != "details" else dict(explain=resultExpensive.explain).items() | list) + dict(isExpensiveNow  = none if FinalExpensiveDict.price==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalExpensiveDict.startTime | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
                           mode           = mode,
                           dataValidation = validateResult,
                           status         = status ) %}
