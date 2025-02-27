@@ -6,7 +6,7 @@ cheapest /most expensive period will occur
 The makro can be called adding just the mySensor_today parameter. Any missing parameter will have a default
 value. Paramaters can be added in any order providing their parameter name is used. If parametername is omitted,
 the correct order of parameters is required to ensure correct parsing. E.g.:<br/>
-  {{- PeriodPrice("sensor.edssensor", durationTimedelta=timedelta(minutes=90)) -}} 
+  {{- PeriodPrice("sensor.edssensor", duration=timedelta(minutes=90)) -}} 
 
 ## Parameters
 Required = *
@@ -117,10 +117,10 @@ For each hour there are up to three points upon calculation is based; first minu
             {#- Add 20min for the normal cycle of dishwasher cooling off and opening door -#}
             {%- set duration=  20 + states('sensor.dishwasher_remaining_time') | int(90) -%}
             {#- Dishwasher is precoded to start 04:30 at the latest, thus providing 'failsafe' -#}
-            {%- set latestDatetime    = earliestDatetime + timedelta(minutes=states('sensor.dishwasher_start_time') | int(8*60) + durationTimedelta) -%}
+            {%- set latestDatetime    = earliestDatetime + timedelta(minutes=states('sensor.dishwasher_start_time') | int(8*60) + duration) -%}
             {#- Get data from EnergiDataService, ignore forecasted values -#}
             {{- PeriodPrice(edsSensor, mySensor_forecast="", 
-                            earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, durationTimedelta=durationTimedelta, 
+                            earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, duration=duration, 
                             hint="Energi Data Service") | from_json -}}
               
 ### Dishwasher must be run at cheapest hour, but be completed by 06:00 tomorrow. Cascade two integrations for data
@@ -130,11 +130,11 @@ For each hour there are up to three points upon calculation is based; first minu
             {#- Add 20min for the normal cycle of dishwasher cooling off and opening door -#}
             {%- set duration= 20 + states('sensor.dishwasher_remaining_time') | int(90) -%}
             {#- Dishwasher is precoded to start 04:30 at the latest, thus providing 'failsafe' -#}
-            {%- set latestDatetime    = earliestDatetime + timedelta(minutes=states('sensor.dishwasher_start_time') | int(8*60) + durationTimedelta)  -%}
+            {%- set latestDatetime    = earliestDatetime + timedelta(minutes=states('sensor.dishwasher_start_time') | int(8*60) + duration)  -%}
             {%- set latestDatetimeStr = latestDatetime | string -%}
 
             {#- Get data from EnergiDataService, ignore forecasted values -#}
-            {%- set resultEDS = PeriodPrice(edsSensor, mySensor_forecast="", earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, durationTimedelta=durationTimedelta, hint="Energi Data Service") | from_json -%}
+            {%- set resultEDS = PeriodPrice(edsSensor, mySensor_forecast="", earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, duration=duration, hint="Energi Data Service") | from_json -%}
             {%- if resultEDS.cheapPrice != none and resultEDS.latestDatetime >= latestDatetime |string -%}
               {{ resultEDS }}
             {%- else -%}
@@ -143,7 +143,7 @@ For each hour there are up to three points upon calculation is based; first minu
               {%- set resultSL = PeriodPrice(mySensor_today=dict(data=state_attr(slSensor, "prices"), timeTag="start", priceTag="price"),
                                              mySensor_tomorrow=dict(data=state_attr(slSensor_tomorrow, "prices"), timeTag="start", priceTag="price"),
                                              mySensor_forecast="",
-                                             earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, durationTimedelta=durationTimedelta,
+                                             earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, duration=duration,
                                              hint="Strømligning") | from_json %}
               {%- if resultSL.cheapPrice != none and resultSL.latestDatetime >= latestDatetime |string -%}
                 {{ resultSL }}
@@ -164,7 +164,7 @@ The last example can be extended by using additional integrations (e.g. Nordpool
             {%- set duration  = 60 -%}
             {#- Get data from EnergiDataService, ignore forecasted values -#}
             {{- PeriodPrice(edsSensor, mySensor_forecast="", 
-                            earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, durationTimedelta=durationTimedelta, 
+                            earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, duration=duration, 
                             hint="Energi Data Service") | from_json -}}
 
 ### Get cheapest period within the next 12 hours, where power consumption expected is 1.2kWh, distributed (in 15 minute intervals) to be 0.4kWh, 0.3kWh, 0.18kWh, 0.17kWh, 0.1 kWh and 0.05kWh.
@@ -175,7 +175,7 @@ The last example can be extended by using additional integrations (e.g. Nordpool
             {%- set duration  = timedelta(minutes=90 ) -%}
             {#- Get data from EnergiDataService, ignore forecasted values -#}
             {{- PeriodPrice(edsSensor, mySensor_forecast="", 
-                            earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, durationTimedelta=durationTimedelta, 
+                            earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, duration=duration, 
                             usageWindow=15, kwh_usage=[0.4,0.3,0.18,0.17,0.1,0.05], 
                             hint="Energi Data Service") | from_json -}}
 <br/>
