@@ -366,7 +366,7 @@
   {%- elif mode == "cheapstart" -%}
     {{- result.cheap.startTime | as_datetime if result.price != none else none -}}
   {%- elif mode == "cheapend" -%}
-    {{- (result.cheap.endTime | as_datetime if result.price != none else none -}}
+    {{- result.cheap.endTime | as_datetime if result.price != none else none -}}
   {%- elif mode == "ischeapnow" -%}
     {{- result.cheap.isCheapNow -}}
   {%- elif mode == "expensiveprice" -%}
@@ -374,7 +374,7 @@
   {%- elif mode == "expensivestart" -%}
     {{- result.expensive.startTime | as_datetime if result.price != none else none -}}
   {%- elif mode == "expensiveend" -%}
-    {{- (result.expensive.endTime | as_datetime if result.price != none else none -}}
+    {{- result.expensive.endTime | as_datetime if result.price != none else none -}}
   {%- elif mode == "isexpensivenow" -%}
     {{- result.expensive.isExpensiveNow -}}
   {%- else -%}
