@@ -17,7 +17,7 @@ Required = *
 | mySensor_forecast      |(dict / string) Name of the sensor that contains pricing data for forecast. Same features as mySensor_today.<br/>Note that if mySensor_today is a string, this sensor will default to mySensor_today, otherwise it will default to dict()|
 | earliestDatetime       |(DateTime) Exact date/time of start of window during which electricity will be used. Using mode="default" may change this setting.|
 | latestDatetime         |(DateTime) Exact date/time of end of window during which electricity will be used. Using mode="default" may change this setting.|
-| durationTimedelta      |(Integer / TimeDelta) Duration of electricity usage formatted as either an Integer or TimeDelta. In either case setting will be interpreted as minutes|
+| duration               |(Integer / TimeDelta) Duration of electricity usage formatted as either an Integer or TimeDelta. In either case setting will be interpreted as minutes|
 | returnFirstBool        |(Boolean) Default to true to use first occurrence of the lowest price, otherwise use the last|
 | timeAdherenceStr       |(String) Influences the behaviour when seeking low / high cost<br/><br/>**default** = adjusts time to 'now' if time is in the past<br/>**strict**  = do not adjust time (start / end) and return empty result if window is in the past<br/>**forced**  = do not adjust time (start / end) and return result even if window is in the past|
 | defaultDurationMinNum  |(Integer) Default minimum duration (in minutes) of any period|
@@ -115,7 +115,7 @@ For each hour there are up to three points upon calculation is based; first minu
             {%- set edsSensor         = "sensor.energidataservice" -%}
             {%- set earliestDatetime  = now() -%}
             {#- Add 20min for the normal cycle of dishwasher cooling off and opening door -#}
-            {%- set durationTimedelta =  20 + states('sensor.dishwasher_remaining_time') | int(90) -%}
+            {%- set duration=  20 + states('sensor.dishwasher_remaining_time') | int(90) -%}
             {#- Dishwasher is precoded to start 04:30 at the latest, thus providing 'failsafe' -#}
             {%- set latestDatetime    = earliestDatetime + timedelta(minutes=states('sensor.dishwasher_start_time') | int(8*60) + durationTimedelta) -%}
             {#- Get data from EnergiDataService, ignore forecasted values -#}
@@ -128,7 +128,7 @@ For each hour there are up to three points upon calculation is based; first minu
             {%- set edsSensor         = "sensor.energidataservice" -%}
             {%- set earliestDatetime  = now() -%}
             {#- Add 20min for the normal cycle of dishwasher cooling off and opening door -#}
-            {%- set durationTimedelta = 20 + states('sensor.dishwasher_remaining_time') | int(90) -%}
+            {%- set duration= 20 + states('sensor.dishwasher_remaining_time') | int(90) -%}
             {#- Dishwasher is precoded to start 04:30 at the latest, thus providing 'failsafe' -#}
             {%- set latestDatetime    = earliestDatetime + timedelta(minutes=states('sensor.dishwasher_start_time') | int(8*60) + durationTimedelta)  -%}
             {%- set latestDatetimeStr = latestDatetime | string -%}
@@ -161,7 +161,7 @@ The last example can be extended by using additional integrations (e.g. Nordpool
             {%- set edsSensor           = "sensor.energidataservice" -%}
             {%- set earliestDatetime    = now() -%}
             {%- set latestDatetime      = earliestDatetime + 12*60 -%}
-            {%- set durationTimedelta   = 60 -%}
+            {%- set duration  = 60 -%}
             {#- Get data from EnergiDataService, ignore forecasted values -#}
             {{- PeriodPrice(edsSensor, mySensor_forecast="", 
                             earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, durationTimedelta=durationTimedelta, 
@@ -172,7 +172,7 @@ The last example can be extended by using additional integrations (e.g. Nordpool
             {%- set edsSensor           = "sensor.energidataservice" -%}
             {%- set earliestDatetime    = now() -%}
             {%- set latestDatetime      = earliestDatetime + timedelta(hours=12) -%}
-            {%- set durationTimedelta   = timedelta(minutes=90 ) -%}
+            {%- set duration  = timedelta(minutes=90 ) -%}
             {#- Get data from EnergiDataService, ignore forecasted values -#}
             {{- PeriodPrice(edsSensor, mySensor_forecast="", 
                             earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, durationTimedelta=durationTimedelta, 
