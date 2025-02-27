@@ -46,7 +46,7 @@ When mode is default or details, the returned value (passed throught the from_js
 If mode is details, follwing data will also be available under the relevant JSONs
 | Parameter | Description |
 |-----------|-------------|
-| window                | <ins>Under cheap/expensive JSON</ins><br/>Explaination for calculation to reach price.<br/>Set of [{ start, minutes, kWh_price, est_kWh },...] covering the whole duration. Start defines when each subset starts, length in minutes of the subset, kWh_price is the corresponding price and est_kWh is the kWh part of the corresponding slice. kWh_price * est_kWh is the estimated cost for the slice.|
+| explain                    | <ins>Under cheap/expensive JSON</ins><br/>Explaination for calculation to reach price.<br/>Set of [{ start, minutes, kWh_price, est_kWh },...] covering the whole duration. Start defines when each subset starts, length in minutes of the subset, kWh_price is the corresponding price and est_kWh is the kWh part of the corresponding slice. kWh_price * est_kWh is the estimated cost for the slice.|
 |validate                    | <ins>Under window JSON</ins><br/>JSON with following possible fields:<br/>**validationMode** = Lower case version of _validateData_<br/>**check**          = Status of last validation<br/>**kept**           = Number of kept records<br/>**lastGood**       = Last good record<br/>**invalid**        = First bad record
 <br/>
 <br/>
