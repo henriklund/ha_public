@@ -18,7 +18,7 @@ Required = *
 | earliestDatetime       |(DateTime) Exact date/time of start of window for which electricity pricing will be used.|
 | latestDatetime         |(DateTime) Exact date/time of end of window for which electricity pricing will be used.|
 | duration               |(Integer / TimeDelta) Duration of the expected electricity usage.|
-| returnFirstBool        |(Boolean) Default to true to use first occurrence of the lowest price, otherwise use the last.|
+| returnFirstBool        |(Boolean) Default to true to use first occurrence of the lowest / highest price, otherwise use the last.|
 | timeAdherence          |(String) Influences the behaviour when seeking low / high cost.|
 | mode                   |(String) defines what is returned by the macro.|
 | hint                   |String to be returned as part of the result. |
