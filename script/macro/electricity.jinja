@@ -44,7 +44,7 @@
               {%- set datePrice.dateTag = datePrice.dateTag if datePrice.date!=none and datePrice.date < tmpTime else item -%}
               {%- set datePrice.date    = datePrice.date | as_datetime   if datePrice.date!=none and datePrice.date < tmpTime else tmpTime -%}
             {# Only process something that is a number as a number, and only for the first match #}
-            {%- elif vObj is number and (vObj | int(2) - vObj | int(1) == 0) and datePrice.price == none -%}
+            {%- elif vObj is number and (vObj | int(2) == vObj | int(1)) and datePrice.price == none -%}
               {% set datePrice.price = vObj -%}
               {% set datePrice.priceTag = item -%}
             {%- endif -%}
