@@ -156,7 +156,7 @@
   {#- Validate and set duration -#}
   {%- set minDuration            = defaultDurationMinNum if defaultDuration is number else defaultDurationMinNum -%}
   {%- set duration               = (duration.seconds // 60) if duration is not number and duration.total_seconds() is defined else duration -%}
-  {%- set duration               = 60 * (minDuration if duration is not defined or (duration | int != duration) or duration < minDuration else duration)-%}
+  {%- set duration               = 60 * (minDuration if duration is not defined or (duration | int != duration) or duration < minDuration else duration) -%}
   {%- set durationMinutes        = duration | int(minDuration * priceWindow) // 60 -%}
   {%- set durationMinutesResidual= durationMinutes % priceWindow -%}
   {%- set durationUnits          = ((durationMinutes // priceWindow) + (1 if durationMinutesResidual > 0 else 0)) | int -%}
@@ -353,8 +353,8 @@
                               ([] if validateData=="ignore" else 
                                (dict(check=validate.check).items() | list +
                                  ([] if validate.check=="ok" else dict(kept=validate.idx, lastGood=(none if validate.lastGood==None else validate.lastGood.myStart | as_datetime | as_local) | string, invalid=(none if validate.this==None else validate.this.myStart | as_datetime | as_local) | string).items() | list)))) %}
-  {%- set result = dict(  window         = dict(resultWindow.items()       | list + ([] if mode != "details" else resultDetails.items()                                | list)),
-                          cheap          = dict(FinalCheapDict.items()     | list + ([] if mode != "details" else dict(explain=resultCheap.explain).items()         | list) + dict(isCheapNow      = none if FinalCheapDict.price        ==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalCheapDict.startTime         | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
+  {%- set result = dict(  window         = dict(resultWindow.items()       | list + ([] if mode != "details" else resultDetails.items()                         | list)),
+                          cheap          = dict(FinalCheapDict.items()     | list + ([] if mode != "details" else dict(explain=resultCheap.explain).items()     | list) + dict(isCheapNow      = none if FinalCheapDict.price    ==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalCheapDict.startTime     | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
                           expensive      = dict(FinalExpensiveDict.items() | list + ([] if mode != "details" else dict(explain=resultExpensive.explain).items() | list) + dict(isExpensiveNow  = none if FinalExpensiveDict.price==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalExpensiveDict.startTime | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
                           mode           = mode,
                           dataValidation = validateResult,
