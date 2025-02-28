@@ -32,13 +32,14 @@
         {%- if timeTag not in data[0] or priceTag not in data[0] -%}
           {%- for item in data[0] -%}
             {# This check should cover both datetime objects, strings and timestamps delivered as "time" #}
-            {%- if data[0][item] | as_datetime is datetime and (data[0][item] is not number or data[0][item] > 99999999) -%}
-              {%- set tmpTime = data[0][item] | as_datetime | as_timestamp -%}
+            {% set vObj = data[0][item] %}
+            {%- if vObj | as_datetime is datetime and (vObj is not number or vObj > 99999999) -%}
+              {%- set tmpTime = vObj | as_datetime | as_timestamp -%}
               {%- set datePrice.dateTag = datePrice.dateTag if datePrice.date!=none and datePrice.date < tmpTime else item -%}
               {%- set datePrice.date    = datePrice.date | as_datetime   if datePrice.date!=none and datePrice.date < tmpTime else tmpTime -%}
             {# Only process something that is a number as a number, and only for the first match #}
-            {%- elif data[0][item] is number and datePrice.price == none -%}
-              {% set datePrice.price = data[0][item] -%}
+            {%- elif vObj is number and (vObj | int(2) - vObj | int(1) == 0) and datePrice.price == none -%}
+              {% set datePrice.price = vObj -%}
               {% set datePrice.priceTag = item -%}
             {%- endif -%}
           {%- endfor -%}
@@ -155,7 +156,7 @@
   {#- Validate and set duration -#}
   {%- set minDuration            = defaultDurationMinNum if defaultDuration is number else defaultDurationMinNum -%}
   {%- set duration               = (duration.seconds // 60) if duration is not number and duration.total_seconds() is defined else duration -%}
-  {%- set duration               = (minDuration * 60) if duration is not defined or (duration | int != duration) or duration < minDuration else (duration * 60)-%}
+  {%- set duration               = 60 * (minDuration if duration is not defined or (duration | int != duration) or duration < minDuration else duration)-%}
   {%- set durationMinutes        = duration | int(minDuration * priceWindow) // 60 -%}
   {%- set durationMinutesResidual= durationMinutes % priceWindow -%}
   {%- set durationUnits          = ((durationMinutes // priceWindow) + (1 if durationMinutesResidual > 0 else 0)) | int -%}
