@@ -13,8 +13,10 @@
                     ) -%}
 
 {# Constants #}
-{% set defaultDurationMinNum = 5 %}
-{% set defaultPeriodHrsNum   = 24 %}
+{%- set defaultDurationMinNum = 5 -%}
+{%- set defaultPeriodHrsNum   = 24 -%}
+{%- set defaultTimeTag        = "start" -%}
+{%- set defaultPriceTag       = "price" -%}
 
   {#-####################################################################-#}
   {#-
@@ -28,8 +30,12 @@
     {%- macro LoadSensor(data, timeTag=none, priceTag=none) -%}
       {%- set datePrice = namespace(dateTag=none, date = none, priceTag=none, price = none) -%}
       {%- if data != none and data | length > 0 -%}
+        {# Check for the presence of the default defined tags (if no tags were provided #}
+        {%- if timeTag == none and priceTag == none and data[0][defaultTimeTag] is defined and data[0][defaultPriceTag] is defined -%}
+          {%- set timeTag = defaultTimeTag -%}
+          {%- set priceTag = defaultPriceTag -%}
         {# If one of the tags is missing, assume we need to look for them both #}
-        {%- if timeTag not in data[0] or priceTag not in data[0] -%}
+        {%- elif timeTag not in data[0] or priceTag not in data[0] -%}
           {%- for item in data[0] -%}
             {# This check should cover both datetime objects, strings and timestamps delivered as "time" #}
             {% set vObj = data[0][item] %}
