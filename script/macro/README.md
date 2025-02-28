@@ -34,9 +34,9 @@ Possible value formats (* indicates optional):
 
 A value of "" or dict() is used to indicate 'empty value' and means that this particular sensor and subsequent sensor(s) data will be ignored. The sensors order is mySensor_today -> mySensor_tomorrow -> mySensor_forecast.
 If "entity_id" format is used, it is assumed that the sensor has an attribute that (dependent on the _mySensor_xxxxxx_ addressed) will be either _raw_today_, _raw_tomorrow_ or _forecast_. If this is not the case for the sensor, use the dict instead.<br/>
-In the dict, the data must be formatted as a list of pairs, i.e. [{key_date=date1, key_price=price1}, {key_date=date2, key_price=price2}, ...]. If timeTag and price are omitted, macro attempts to identify suitable candites for names:<br/>
+In the dict, the data must be formatted as a list of pairs, i.e. [{key_date=date1, key_price=price1}, {key_date=date2, key_price=price2}, ...]. If timeTag and price are omitted, macro attempts to see of the default values (_timeTag = start_ and _priceTag = price_) work. If that fails it will attemtp to identify suitable candites for the key names:<br/>
 - A value will be identified as a date, if it is a datetime (number, string or datetime object) and is either not a number or a number that translate larger than 99999999 (a date in 1973). The corresponding key will used as timeTag for the lowest value found.
-- A value will be identified as a number, if it is either _is_ a number or if the following simple match equation is 0 ( x |int(1) - x int(2) ). A string will fail the 'is number' while a number will pass that check. Only a number will pass the match equation :)
+- A value will be identified as a number, if it either _is_ a number or if int filter return something usable. ( X |int(1) - X int(2) ) is a check that will ensure this since an invalid value will return default and thus never result in the final result being zero :)
 
 ### earliestDatetime / latestDatetime
 A datatime object may be provided for start / end of the window during which cheapest / most expensive price is calculated. _earliestDatetime_ will default to _now()_ if omitted. _latestDatetime_ will be set to _earliestDatetime_ + _defaultPeriodHrsNum_ (24) hours if omitted. Furthermore, see _timeAdherence_ for how that will affect _earliestDatetime_ / _latestDatetime_.
