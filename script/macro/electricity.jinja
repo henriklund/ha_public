@@ -59,7 +59,7 @@
         {# Make up for the odd case where both are identical (not valid result) or one of the tags is None. If not the case, rebuild the set #}
         {%- if timeTag != priceTag and timeTag != none and priceTag != none -%}
           {%- for item in data -%}
-            {%- set newSensor.dict = newSensor.dict + [dict(myStart=(item[timeTag] | string | as_timestamp), myPrice=item[priceTag])] -%}
+            {%- set newSensor.dict = newSensor.dict + [dict(myStart=(item[timeTag] | as_datetime | as_timestamp ), myPrice=item[priceTag])] -%}
           {%- endfor -%}
         {%- endif -%}
         {{- newSensor.dict | to_json -}}
