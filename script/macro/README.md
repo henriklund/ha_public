@@ -12,25 +12,72 @@ the correct order of parameters is required to ensure correct parsing. E.g.:<br/
 Required = *
 | Parameter | Description |
 |-----------|-------------|
-| * mySensor_today       |(dict / String). if dict is used, the dict is expected to contain _data_ (list of paired time + price), and the names of the pairs (timeTag / priceTag). If timeTag / priceTag are omitted, macro will try to guess the correct names. If a string is supplied, macro will collect data and assume that timeTag / priceTag equal defaults. If set to dict() or "", the data will excluded from evaluation as well as subsequent data. E.g. setting mySensor_tomorrow to "" will cause data for tomorrow and forecast to be omitted.<br/>If dict is used, following format must be used _dict(data=state_attr(sensor, attribute), timeTag="tag_str", priceTag="price_str")_
-| mySensor_tomorrow      |(dict / string) Name of the sensor that contains pricing data for tomorrow. Same features as mySensor_today.<br/>Note that if mySensor_today is a string, this sensor will default to mySensor_today, otherwise it will default to dict()|
-| mySensor_forecast      |(dict / string) Name of the sensor that contains pricing data for forecast. Same features as mySensor_today.<br/>Note that if mySensor_today is a string, this sensor will default to mySensor_today, otherwise it will default to dict()|
-| earliestDatetime       |(DateTime) Exact date/time of start of window during which electricity will be used. Using mode="default" may change this setting.|
-| latestDatetime         |(DateTime) Exact date/time of end of window during which electricity will be used. Using mode="default" may change this setting.|
-| duration               |(Integer / TimeDelta) Duration of electricity usage formatted as either an Integer or TimeDelta. In either case setting will be interpreted as minutes|
-| returnFirstBool        |(Boolean) Default to true to use first occurrence of the lowest price, otherwise use the last|
-| timeAdherenceStr       |(String) Influences the behaviour when seeking low / high cost<br/><br/>**default** = adjusts time to 'now' if time is in the past<br/>**strict**  = do not adjust time (start / end) and return empty result if window is in the past<br/>**forced**  = do not adjust time (start / end) and return result even if window is in the past|
-| defaultDurationMinNum  |(Integer) Default minimum duration (in minutes) of any period|
-| defaultPeriodHrsNum    |(Integer) The default duration of hours to look for cheapest prices|
-| mode                   |default / details /<br/>cheapPrice / cheapStart / expensiveStart / isCheapNow<br/>expensivePrice / expensiveStart / expensiveStart / isExpensiveNow|
-| hint                   |String to be returned as part of the result. This could (e.g.) be the name of the integration providing data|
-| usageWindow            |Integer (1-60) of minutes that each part of the kwg_usage list is valid for. If omitted, 60 will be used|
-| kwh_usage              |Either a list [] of numbers, or a single (total) number of expected kWh consumed.<br/>If only one number is provided, this is assumed to be be total consumption and will be distributed evenly across duration. If a list is provided, the consumption for that particular timeslice (of duration) will be the kWh listed. The length of each timeslice is given by _usageWindow_|
-|validateData            |Allows validation of price data. A valid check means that all dates in today / tomorrow / forecast are spaced at the same intervals, and that the intervals between today -> tomorrow and tomorrow -> forecast are also spaced at this interval<br/>**ignore**      = do not validate data<br/>**prune**       = check for error, stop at first and keep data until this point<br/>**stopOnError** = check for error, stop at first and stop further processing
+| * mySensor_today       |(dict / String) Name of the sensor that contain pricing data for today.|
+| mySensor_tomorrow      |(dict / string) Name of the sensor that contains pricing data for tomorrow.<br/>Note that if mySensor_today is a string, this sensor will default to mySensor_today, otherwise it will default to dict()|
+| mySensor_forecast      |(dict / string) Name of the sensor that contains pricing data for forecast.<br/>Note that if mySensor_today is a string, this sensor will default to mySensor_today, otherwise it will default to dict()|
+| earliestDatetime       |(DateTime) Exact date/time of start of window for which electricity pricing will be used.|
+| latestDatetime         |(DateTime) Exact date/time of end of window for which electricity pricing will be used.|
+| duration               |(Integer / TimeDelta) Duration of the expected electricity usage.|
+| returnFirstBool        |(Boolean) Default to true to use first occurrence of the lowest price, otherwise use the last.|
+| timeAdherence          |(String) Influences the behaviour when seeking low / high cost.|
+| mode                   |(String) defines what is returned by the macro.|
+| hint                   |String to be returned as part of the result. |
+| usageWindow            |Integer (1-60) of minutes that each part of the kwg_usage list is valid for. If omitted, 60 will be used.|
+| kwh_usage              |Either a list [] of numbers, or a single (total) number of expected kWh consumed.|
+| validateData            |Allows validation of price data.|
 
+
+### mySensor_xxxxxx
+Possible value formats (* indicates optional):
+- "entity_id""
+- dict(data:[], *timeTag="string", *priceTag="string)
+
+A value of "" or dict() is used to indicate 'empty value' and means that this particular sensor and subsequent sensor(s) data will be ignored. The sensors order is mySensor_today -> mySensor_tomorrow -> mySensor_forecast.
+If "entity_id" format is used, it is assumed that the sensor has an attribute that (dependent on the _mySensor_xxxxxx_ addressed) will be either _raw_today_, _raw_tomorrow_ or _forecast_. If this is not the case for the sensor, use the dict instead.<br/>
+In the dict, the data must be formatted as a list of pairs, i.e. [{key_date=date1, key_price=price1}, {key_date=date2, key_price=price2}, ...]. If timeTag and price are omitted, macro attempts to identify suitable candites for names:<br/>
+- A value will be identified as a date, if it is a datetime (number, string or datetime object) and is either not a number or a number that translate larger than 99999999 (a date in 1973). The corresponding key will used as timeTag for the lowest value found.
+- A value will be identified as a number, if it is either _is_ a number or if the following simple match equation is 0 ( x |int(1) - x int(2) ). A string will fail the 'is number' while a number will pass that check. Only a number will pass the match equation :)
+
+### earliestDatetime / latestDatetime
+A datatime object may be provided for start / end of the window during which cheapest / most expensive price is calculated. _earliestDatetime_ will default to _now()_ if omitted. _latestDatetime_ will be set to _earliestDatetime_ + _defaultPeriodHrsNum_ (24) hours if omitted. Furthermore, see _timeAdherence_ for how that will affect _earliestDatetime_ / _latestDatetime_.
+
+### duration
+Possible value formats:
+- number
+- timedelta()
+
+If a timedelta formatted value is provided, duration is rounded to whole minutes.
+
+### timeAdherence
+**default**&nbsp;&nbsp;&nbsp;adjusts time to 'now' if time is in the past (default value)<br/>
+**strict**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do not adjust time (start / end) and return empty result if window is in the past<br/>
+**forced**&nbsp;&nbsp;&nbsp;&nbsp;do not adjust time (start / end) and return result even if window is in the past
+
+### mode
+Defines what is returned by the macro (default being, well the default). Note that all data returned will be formatted as a string.<br/>
+default / details returns a json (see below under **Returns**. _details_ will contain same data as default + explain information + priceWindow + usageWindow./<br/>
+cheapPrice / cheapStart / expensiveStart / isCheapNow / expensivePrice / expensiveStart / expensiveStart / isExpensiveNow will return a single string containing the requested value (suited for use in a Helper Template Sensor).
+
+### Hint
+String to be returned as part of the result. This could (e.g.) be the name of the integration providing data. If _mySensor_xxxxxx_ is an entity_id, hint will return the friendly name if omitted.
+
+### kwh_usage / usageWindow
+Possible value formats:
+- number
+- []
+
+If only one number is provided, this is assumed to be be total consumption and will be distributed evenly across duration.<br/>
+If a list [] is provided, the consumption for that particular period of time (defined by the _usageWindow_), or timeslice, will be the kWh listed. See further below under **Slicing / kwh_usage**
+
+### validateData
+validateData will permit checking of the data provided by _mySensor_xxxxxx_. A valid check means that all dates in today / tomorrow / forecast is spaced at the same intervals, and that the intervals between today -> tomorrow and tomorrow -> forecast are also spaced at this interval<br/>
+**ignore**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;do not validate data (default)<br/>
+**prune**&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;check for error, stop at first and keep data until this point<br/>
+**stopOnError**&nbsp;&nbsp;&nbsp;check for error, stop at first and stop further processing
+ 
 ## Returns
 Macro returns a STRING(!) based on the MODE setting. In case of a mode of default or details, the returned string will
-be json formatted and must be converted using the from_json filter.
+be json formatted and must be converted using the _from_json_ filter.
 
 When mode is default or details, the returned value (passed throught the from_json filter may contain following fields:
 
