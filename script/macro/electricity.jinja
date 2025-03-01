@@ -256,16 +256,12 @@
   -#}
   {%- set durationDiff           = max(0, durationMinutes - (latestDatetime - earliestDatetime) // 60) -%}
   {%- set latestDatetime         = latestDatetime + (0 if timeAdherence in ['strict','forced'] else 60 * durationDiff) -%}
-  {#%- set latestDatetimeComp     = (latestDatetime - timedelta(hours=durationUnits + (1 if durationMinutesResidual > 0 else 0))) -%#}
+
   {%- set mode                   = mode | lower -%}
- 
-  {%- if mode not in [
-                        "default", "details", "detailscompact",
-                        "cheapprice", "cheapstart", "cheapend", "ischeapnow", 
-                        "expensiveprice", "expensivestart", "expensiveend", "isexpensivenow"
-                      ] -%}
-    {%- set mode = "default" -%}
-  {%- endif -%}
+  {%- set mode = mode if mode in [ "default", "details", "detailscompact",
+                                   "cheapprice", "cheapstart", "cheapend", "ischeapnow", 
+                                   "expensiveprice", "expensivestart", "expensiveend", "isexpensivenow" ] 
+                      else "default" -%}
 
   {%- if status == "ok" %}
     {#- If, under 'strict' time adherence, where the provided latestDatetime is in the past, return an error -#}
@@ -278,16 +274,14 @@
   {#-####################################################################-#}
   {#- Set result name spaces -#}
   {%- set resultCheap     = namespace(pricing=none, priceStartTime=None, explain=[]) -%}
-  {%- set resultExpensive = namespace(pricing=none,    priceStartTime=None, explain=[]) -%}
+  {%- set resultExpensive = namespace(pricing=none, priceStartTime=None, explain=[]) -%}
 
   {#-####################################################################-#}
   {#- Only run if we have price data and no error so far -#}
   {%- if prices_len > 0 and status=="ok" -%}
     {#- Do not allow latestDatetime to be after last price available - makes no sense -#}
     {%- set tmp = prices[arrSize-1].start + priceWindowSeconds -%}
-    {%- if latestDatetime > tmp -%}
-      {%- set latestDatetime = tmp -%}
-    {%- endif -%}
+    {%- set latestDatetime = tmp if latestDatetime > tmp else latestDatetime -%}
 
     {#-####################################################################-#}
     {#-
@@ -297,10 +291,8 @@
     -#}
     {#- Loop all timeslot where a pricing exists -#}
     {%- set loopSet = [0] -%}
-    {%- if durationMinutesResidual != 0 -%}
-      {%- set tmpVal = priceWindow - durationMinutesResidual -%}
-      {%- set loopSet = loopSet + ([] if tmpVal in loopSet else [tmpVal]) -%}
-    {%- endif -%}
+    {%- set tmpVal  = (priceWindow - durationMinutesResidual) % priceWindow -%}
+    {%- set loopSet = loopSet + ([] if tmpVal in loopSet else [tmpVal]) -%}
     
     {%- set priceSet          = namespace( idx=0, size=priceWindow, left=0 ) -%}
     {%- set sliceSet          = namespace( idx=0, size=usageWindow, left=0 ) -%}
@@ -332,8 +324,8 @@
           {%- for i in range(reqUsageSlices * (arrSize+2)) if (totalLen.value<durationMinutes) and (usageLen == 0 or sliceSet.idx < kwh_usage | length) and priceSet.idx < arrSize -%}
             {%- set workLen         = min(priceSet.left, sliceSet.left, durationMinutes - totalLen.value ) -%}
             {%- set kwh             = 1 if usageLen == 0 else kwh_usage[sliceSet.idx] -%}
-            {%- set priceFactor     = kwh * workLen / usageWindow -%}
             {%- set kwh_price       = prices[priceSet.idx].price -%}
+            {%- set priceFactor     = kwh * workLen / usageWindow -%}
             {%- set tmpValue        = kwh_price * priceFactor -%}
             {%- set pricing.value   = pricing.value + tmpValue -%}
             {%- set timeValue       = priceStartTime + 60 * totalLen.value -%}
