@@ -30,7 +30,7 @@
     {%- macro LoadSensor(data, timeTag=none, priceTag=none) -%}
       {%- set datePrice = namespace(dateTag=none, date = none, priceTag=none, price = none) -%}
       {%- if data != none and data | length > 0 -%}
-        {# Check for the presence of the default defined tags (if no tags were provided #}
+
         {%- if timeTag == none and priceTag == none and data[0][defaultTimeTag] is defined and data[0][defaultPriceTag] is defined -%}
           {%- set timeTag = defaultTimeTag -%}
           {%- set priceTag = defaultPriceTag -%}
@@ -44,7 +44,7 @@
               {%- set datePrice.dateTag = datePrice.dateTag if datePrice.date!=none and datePrice.date < tmpTime else item -%}
               {%- set datePrice.date    = datePrice.date | as_datetime   if datePrice.date!=none and datePrice.date < tmpTime else tmpTime -%}
             {# Only process something that is a number as a number, and only for the first match #}
-            {%- elif vObj is number and (vObj | int(2) == vObj | int(1)) and datePrice.price == none -%}
+            {%- elif vObj is number and (vObj | int(2) - vObj | int(1) == 0) and datePrice.price == none -%}
               {% set datePrice.price = vObj -%}
               {% set datePrice.priceTag = item -%}
             {%- endif -%}
@@ -52,14 +52,14 @@
         {%- endif -%}
 
         {# If no tags were passed on, assume tags found are to be used. If tags were passed on, only use them if the are found in data set #}
-        {%- set timeTag  = ("myStart" if "myStart" in data[0] else datePrice.dateTag)  if  timeTag is none else (timeTag if timeTag in data[0] else none)%}
-        {%- set priceTag = ("myPrice" if "myPrice" in data[0] else datePrice.priceTag) if priceTag is none else (priceTag if priceTag in data[0] else none) -%}
+        {%- set timeTag  = ("start" if "start" in data[0] else datePrice.dateTag)  if  timeTag is none else (timeTag if timeTag in data[0] else none)%}
+        {%- set priceTag = ("price" if "price" in data[0] else datePrice.priceTag) if priceTag is none else (priceTag if priceTag in data[0] else none) -%}
 
         {%- set newSensor = namespace(dict=[]) -%}
         {# Make up for the odd case where both are identical (not valid result) or one of the tags is None. If not the case, rebuild the set #}
         {%- if timeTag != priceTag and timeTag != none and priceTag != none -%}
           {%- for item in data -%}
-            {%- set newSensor.dict = newSensor.dict + [dict(myStart=(item[timeTag] | as_datetime | as_timestamp ), myPrice=item[priceTag])] -%}
+            {%- set newSensor.dict = newSensor.dict + [dict(start=(item[timeTag] | as_datetime | as_timestamp ), price=item[priceTag])] -%}
           {%- endfor -%}
         {%- endif -%}
         {{- newSensor.dict | to_json -}}
@@ -67,7 +67,40 @@
         {{- [] -}}
       {%- endif -%}
     {%- endmacro -%}
+  
+  {#-####################################################################-#}
+    {%- macro OptimizeData(workData, priceWindows) -%}
+      {#- Load prices in datetime format for easy comparison -#}
+      {%- set startTimes = priceWindows | map(attribute="start") | map("as_datetime") | map("as_local") | list -%}
+      {%- set ns=namespace(dict=[]) %}
+      {%- set ws=namespace(start=none, minutes=none, kWh_price=none, est_kWh=none, sum=none) %}
+      
+      {%- for i in range(workData | length) %}
+        {%- set item = workData[i] %}
 
+        {#- Compact list based on the different price slots -#}
+        {%- if (i>0) and not(ws.start | as_datetime + timedelta(minutes=ws.minutes)) in startTimes %}
+          {%- set ws.minutes = ws.minutes + item.minutes %}
+          {%- set ws.est_kWh = ws.est_kWh + item.est_kWh %}
+          {%- set ws.sum = ws.sum + item.sum %}
+        {%- else %}
+          {%- if i>0 %}
+            {%- set ns.dict=ns.dict+[dict(start=ws.start, minutes=ws.minutes, kWh_price=ws.kWh_price, est_kWh=ws.est_kWh | round(6), sum=ws.sum | round(6))] %}
+          {%- endif %}
+          {%- set ws.start=item.start %}
+          {%- set ws.minutes=item.minutes %}
+          {%- set ws.kWh_price=item.kWh_price %}
+          {%- set ws.est_kWh=item.est_kWh %}
+          {%- set ws.sum=item.sum %}
+        {%- endif %}
+        {#- Get the last record stored -#}
+        {%- if i==workData | length-1 %}
+          {%- set ns.dict=ns.dict+[dict(start=ws.start, minutes=ws.minutes, kWh_price=ws.kWh_price, est_kWh=ws.est_kWh | round(6), sum=ws.sum | round(6))] %}
+        {%- endif %}
+      {%- endfor %}
+      {{- ns.dict | to_json -}}
+    {%- endmacro -%}
+  
   {#-####################################################################-#}
   {#- Prepare input parameters -#}
   {%- set status = "ok" -%}
@@ -131,7 +164,7 @@
     {%- endif -%}
 
     {%- if prices | length >= 2 -%}
-      {%- set priceWindow = ((prices[1].myStart - prices[0].myStart) / 60) | int(60) -%}
+      {%- set priceWindow = ((prices[1].start - prices[0].start) / 60) | int(60) -%}
     {%- endif -%}
   {%- endif -%}
   {%- set priceWindowSeconds = 60 * priceWindow -%}
@@ -141,7 +174,7 @@
   {%- set validate = namespace(check="ok", idx=-1, lastGood=none, this=none) -%}
   {%- if validateData != "ignore" -%}
     {%- for i in range(prices_len) if validate.check == "ok" -%}
-      {%- if i>1 and prices[i].myStart != prices[i-1].myStart + priceWindowSeconds -%}
+      {%- if i>1 and prices[i].start != prices[i-1].start + priceWindowSeconds -%}
         {%- set validate.check = "inconsistentDataset" -%}
         {%- set validate.idx = i -%}
       {%- endif -%}
@@ -227,7 +260,7 @@
   {%- set mode                   = mode | lower -%}
  
   {%- if mode not in [
-                        "default", "details",
+                        "default", "details", "detailscompact",
                         "cheapprice", "cheapstart", "cheapend", "ischeapnow", 
                         "expensiveprice", "expensivestart", "expensiveend", "isexpensivenow"
                       ] -%}
@@ -251,7 +284,7 @@
   {#- Only run if we have price data and no error so far -#}
   {%- if prices_len > 0 and status=="ok" -%}
     {#- Do not allow latestDatetime to be after last price available - makes no sense -#}
-    {%- set tmp = prices[arrSize-1].myStart + priceWindowSeconds -%}
+    {%- set tmp = prices[arrSize-1].start + priceWindowSeconds -%}
     {%- if latestDatetime > tmp -%}
       {%- set latestDatetime = tmp -%}
     {%- endif -%}
@@ -276,16 +309,16 @@
     {%- set timeSet           = namespace(dict=[]) -%}
     {%- set pricing           = namespace(value=0) -%}
 
-    {%- for n in range(prices_len) if (n+1==arrSize or earliestDatetime <= prices[n+1].myStart) and (prices[n].myStart + priceWindowSeconds <= latestDatetime) -%}
+    {%- for n in range(prices_len) if (n+1==arrSize or earliestDatetime <= prices[n+1].start) and (prices[n].start + priceWindowSeconds <= latestDatetime) -%}
       {#- Calculat pricing on the hour, at the current minute number as well as at the end of an hour -#}
-      {%- if (earliestDatetime - 60 * earliestDatetimeMinute) == prices[n].myStart -%}
+      {%- if (earliestDatetime - 60 * earliestDatetimeMinute) == prices[n].start -%}
         {%- set tmpVal = earliestDatetimeMinute % priceWindow -%}
         {%- set loopSet = loopSet + ([] if tmpVal in loopSet else [tmpVal]) -%}
       {%- endif -%}
 
       {#- Iterate through the possible minute sets -#}
       {%- for v in range(loopSet | length) -%}
-        {%- set priceStartTime      = prices[n].myStart + 60 * loopSet[v] -%}
+        {%- set priceStartTime      = prices[n].start + 60 * loopSet[v] -%}
         {%- if earliestDatetime <= priceStartTime -%}
           {%- set priceSet.idx      = n -%}
           {%- set priceSet.left     = min(priceWindow-loopSet[v], durationMinutes) -%}
@@ -300,10 +333,11 @@
             {%- set workLen         = min(priceSet.left, sliceSet.left, durationMinutes - totalLen.value ) -%}
             {%- set kwh             = 1 if usageLen == 0 else kwh_usage[sliceSet.idx] -%}
             {%- set priceFactor     = kwh * workLen / usageWindow -%}
-            {%- set kwh_price       = prices[priceSet.idx].myPrice -%}
-            {%- set pricing.value   = pricing.value + kwh_price * priceFactor -%}
+            {%- set kwh_price       = prices[priceSet.idx].price -%}
+            {%- set tmpValue        = kwh_price * priceFactor -%}
+            {%- set pricing.value   = pricing.value + tmpValue -%}
             {%- set timeValue       = priceStartTime + 60 * totalLen.value -%}
-            {%- set timeSet.dict    = timeSet.dict + [ dict(start=timeValue | as_datetime | as_local | string, minutes=workLen, kWh_price=kwh_price, est_kWh=priceFactor | round(6) ) ] -%}
+            {%- set timeSet.dict    = timeSet.dict + [ dict(start=timeValue | as_datetime | as_local | string, minutes=workLen, kWh_price=kwh_price, est_kWh=priceFactor | round(6), sum=tmpValue | round(6) ) ] -%}
             
             {%- set priceSet.left   = priceSet.left - workLen -%}
             {%- if priceSet.left == 0 -%}
@@ -349,6 +383,14 @@
     {%- set status="noWindowFound" -%}
   {%- endif -%}
 
+  {# convert price into human readable (if the should be returned #}
+  {%- if mode in ["details", "detailscompact"] -%}
+    {%- set pricesOut = namespace(dict=[]) %}
+    {%- for item in prices %}
+      {%- set pricesOut.dict = pricesOut.dict + [{'price': item.price, 'start': item.start | as_datetime | as_local | string }] %}
+    {%- endfor %}
+  {%- endif -%}
+  
   {%- set resultDetails = dict( pricingWindow    = priceWindow | int,
                                 usageWindow      = usageWindow | int ) -%}
   {%- set resultWindow  = dict( earliestDatetime = earliestDatetime | as_datetime | as_local | string,
@@ -358,14 +400,15 @@
                             dict(mode=validateData).items() | list +
                               ([] if validateData=="ignore" else 
                                (dict(check=validate.check).items() | list +
-                                 ([] if validate.check=="ok" else dict(kept=validate.idx, lastGood=(none if validate.lastGood==None else validate.lastGood.myStart | as_datetime | as_local) | string, invalid=(none if validate.this==None else validate.this.myStart | as_datetime | as_local) | string).items() | list)))) %}
-  {%- set result = dict(  window         = dict(resultWindow.items()       | list + ([] if mode != "details" else resultDetails.items()                         | list)),
-                          cheap          = dict(FinalCheapDict.items()     | list + ([] if mode != "details" else dict(explain=resultCheap.explain).items()     | list) + dict(isCheapNow      = none if FinalCheapDict.price    ==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalCheapDict.startTime     | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
-                          expensive      = dict(FinalExpensiveDict.items() | list + ([] if mode != "details" else dict(explain=resultExpensive.explain).items() | list) + dict(isExpensiveNow  = none if FinalExpensiveDict.price==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalExpensiveDict.startTime | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
+                                 ([] if validate.check=="ok" else dict(kept=validate.idx, lastGood=(none if validate.lastGood==None else validate.lastGood.start | as_datetime | as_local) | string, invalid=(none if validate.this==None else validate.this.start | as_datetime | as_local) | string).items() | list)))) %}
+  {%- set result = dict(  window         = dict(resultWindow.items()       | list + ([] if mode not in ["details", "detailscompact"] else resultDetails.items()                         | list)),
+                          cheap          = dict(FinalCheapDict.items()     | list + ([] if mode not in ["details", "detailscompact"] else dict(explain=(resultCheap.explain     if mode=="details" else OptimizeData(resultCheap.explain, prices) | from_json)    ).items() | list) + dict(isCheapNow      = none if FinalCheapDict.price    ==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalCheapDict.startTime     | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
+                          expensive      = dict(FinalExpensiveDict.items() | list + ([] if mode not in ["details", "detailscompact"] else dict(explain=(resultExpensive.explain if mode=="details" else OptimizeData(resultExpensive.explain, prices) | from_json)).items() | list) + dict(isExpensiveNow  = none if FinalExpensiveDict.price==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalExpensiveDict.startTime | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
                           mode           = mode,
                           dataValidation = validateResult,
                           status         = status ) %}
   {%- set result = dict( result.items() | list +
+                        (dict(prices=pricesOut.dict) if mode in ["details", "detailscompact"] else dict()).items() | list +
                         (dict() if hint == "" else dict(hint = hint)).items() | list ) -%}                      
                       
   {%- if mode == "cheapprice" -%}
