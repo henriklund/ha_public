@@ -76,10 +76,10 @@ validateData will permit checking of the data provided by _mySensor_xxxxxx_. A v
 **stopOnError**&nbsp;&nbsp;&nbsp;check for error, stop at first and stop further processing
  
 ## Returns
-Macro returns a STRING(!) based on the MODE setting. In case of a mode of default or details, the returned string will
+Macro returns a STRING(!) based on the MODE setting. In case of a mode of default or details / detailsCompact, the returned string will
 be json formatted and must be converted using the _from_json_ filter.
 
-When mode is default or details, the returned value (passed throught the from_json filter may contain following fields:
+When mode is default or details / detailsCompact, the returned value (passed throught the from_json filter may contain following fields:
 
 "*" = only included if a corresponding period was found
 | Parameter | Description |
@@ -90,11 +90,14 @@ When mode is default or details, the returned value (passed throught the from_js
 | status                     | Result of the operation. If not 'ok', then this is an warning / error |
 | hint                       | none or string as provided when  macro was called |
 
-If mode is details, follwing data will also be available under the relevant JSONs
+If mode is details / detailsCompact, follwing data will also be available under the relevant JSONs
 | Parameter | Description |
 |-----------|-------------|
 | explain                    | <ins>Under cheap/expensive JSON</ins><br/>Explaination for calculation to reach price.<br/>Set of [{ start, minutes, kWh_price, est_kWh },...] covering the whole duration. Start defines when each subset starts, length in minutes of the subset, kWh_price is the corresponding price and est_kWh is the kWh part of the corresponding slice. kWh_price * est_kWh is the estimated cost for the slice.|
-|validate                    | <ins>Under window JSON</ins><br/>JSON with following possible fields:<br/>**validationMode** = Lower case version of _validateData_<br/>**check**          = Status of last validation<br/>**kept**           = Number of kept records<br/>**lastGood**       = Last good record<br/>**invalid**        = First bad record
+| prices                     | The full list of prices used for calculation |
+| validate                   | <ins>Under window JSON</ins><br/>JSON with following possible fields:<br/>**validationMode** = Lower case version of _validateData_<br/>**check**          = Status of last validation<br/>**kept**           = Number of kept records<br/>**lastGood**       = Last good record<br/>**invalid**        = First bad record|
+
+If _detailsCompact_ is used, the list in _explain_ will be compacted in accordance to prics irrespectively of the _usageWindow_ or _kwh_usage_ settings.
 <br/>
 <br/>
 For any other mode, the returned value will be a string with the following content:
