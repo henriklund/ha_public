@@ -249,7 +249,7 @@
   {%- set latestDatetimeMinut    = latestDatetime.minute -%}
   {%- set latestDatetimeSecond   = latestDatetime.second -%}
   {%- set latestDatetime         = (latestDatetime | as_timestamp | int) -%}
-  {%- set latestDatetime         = latestDatetime + 60 * (0 if latestDatetimeMinut == 0 else (priceWindow-latestDatetimeMinut) % priceWindow) + latestDatetimeSecond -%}
+  {%- set latestDatetime         = latestDatetime + 60 * (0 if latestDatetimeMinut == 0 else (priceWindow-latestDatetimeMinut) % priceWindow) - latestDatetimeSecond -%}
   {#- 
      Extend latestDatetime in case a duration is provided that exceeds the provided latestDatetime
      Note: latestDatetime is only extended by as many minutes as the window is exceeded with
