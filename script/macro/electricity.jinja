@@ -277,8 +277,8 @@
   
   {#-####################################################################-#}
   {#- Set result name spaces -#}
-  {%- set resultCheap     = namespace(pricing=99999999, priceStartTime=None, explain=[]) -%}
-  {%- set resultExpensive = namespace(pricing=0,    priceStartTime=None, explain=[]) -%}
+  {%- set resultCheap     = namespace(pricing=none, priceStartTime=None, explain=[]) -%}
+  {%- set resultExpensive = namespace(pricing=none,    priceStartTime=None, explain=[]) -%}
 
   {#-####################################################################-#}
   {#- Only run if we have price data and no error so far -#}
@@ -354,7 +354,8 @@
             {%- set totalLen.value=totalLen.value + workLen -%}
           {%- endfor -%}
           {#-####################################################################-#}
-          {%- if (pricing.value<resultCheap.pricing or
+          {%- if (resultCheap.pricing==none or
+                  pricing.value<resultCheap.pricing or
                  (returnFirstBool and pricing.value<=resultCheap.pricing and (resultCheap.priceStartTime is none or priceStartTime<resultCheap.priceStartTime)) or
                  (not returnFirstBool and pricing.value<=resultCheap.pricing and (resultCheap.priceStartTime is none or priceStartTime>resultCheap.priceStartTime))
                  ) and (priceStartTime + 60 * durationMinutes <= latestDatetime) -%}
@@ -362,7 +363,8 @@
             {%- set resultCheap.priceStartTime = priceStartTime -%}
             {%- set resultCheap.explain         = timeSet.dict -%}
           {%- endif -%}
-          {%- if (pricing.value>resultExpensive.pricing or
+          {%- if (resultExpensive.pricing==none or
+                  pricing.value>resultExpensive.pricing or
                  (returnFirstBool and pricing.value>=resultExpensive.pricing and (resultExpensive.priceStartTime is none or priceStartTime<resultExpensive.priceStartTime)) or
                  (not returnFirstBool and pricing.value>=resultExpensive.pricing and (resultExpensive.priceStartTime is none or priceStartTime>resultExpensive.priceStartTime))
                  ) and (priceStartTime + 60 * durationMinutes <= latestDatetime) -%}
