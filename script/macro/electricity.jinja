@@ -1,26 +1,27 @@
-{%- macro PeriodPrice(mySensor_today,
-                      mySensor_tomorrow = mySensor_today if mySensor_today is string else dict(),
-                      mySensor_forecast = mySensor_today if mySensor_today is string else dict(),
+{%- macro PeriodPrice(sensor_today,
+                      sensor_tomorrow = sensor_today if sensor_today is string else dict(),
+                      sensor_forecast = sensor_today if sensor_today is string else dict(),
                       earliestDatetime = null, latestDatetime=null,
                       duration = 60,
-                      returnFirstBool = true,
+                      returnFirst = true,
                       timeAdherence = "default",
                       mode = "default",
                       hint = "",
                       usageWindow = 60,
-                      kwh_usage = [],
+                      expectedConsumption = [],
                       validateData = "ignore"
                     ) -%}
 
-{# Constants #}
-{%- set defaultDurationMinNum = 5 -%}
-{%- set defaultPeriodHrsNum   = 24 -%}
-{%- set defaultTimeTag        = "start" -%}
-{%- set defaultPriceTag       = "price" -%}
+  {# Constants #}
+  {%- set defaultDurationMinNum = 5 -%}
+  {%- set defaultPeriodHrsNum   = 24 -%}
+  {%- set defaultTimeTag        = "start" -%}
+  {%- set defaultPriceTag       = "price" -%}
+  {%- set sanityDate            = (today_at("00:00") - timedelta(hours=24)) | as_timestamp -%}
 
   {#-####################################################################-#}
   {#-
-    Note that macro can be called adding just the mySensor_today parameter. Any parameter can be added in any order
+    Note that macro can be called adding just the sensor_today parameter. Any parameter can be added in any order
     providing that it is written using the parameter name. When leaving out parameters, this is mandatory to ensure
     correct parsing. E.g. {{- PeriodPrice("sensor.edssensor", duration=timedelta(minutes=90)) -}}
 
@@ -39,7 +40,7 @@
           {%- for item in data[0] -%}
             {# This check should cover both datetime objects, strings and timestamps delivered as "time" #}
             {% set vObj = data[0][item] %}
-            {%- if vObj | as_datetime is datetime and (vObj is not number or vObj > 99999999) -%}
+            {%- if vObj | as_datetime is datetime and (vObj is not number or vObj > sanityDate) -%}
               {%- set tmpTime = vObj | as_datetime | as_timestamp -%}
               {%- set datePrice.dateTag = datePrice.dateTag if datePrice.date!=none and datePrice.date < tmpTime else item -%}
               {%- set datePrice.date    = datePrice.date | as_datetime   if datePrice.date!=none and datePrice.date < tmpTime else tmpTime -%}
@@ -73,7 +74,7 @@
       {#- Load prices in datetime format for easy comparison -#}
       {%- set startTimes = priceWindows | map(attribute="start") | map("as_datetime") | map("as_local") | list -%}
       {%- set ns=namespace(dict=[]) %}
-      {%- set ws=namespace(start=none, minutes=none, kWh_price=none, est_kWh=none, sum=none) %}
+      {%- set ws=namespace(start=none, minutes=none, unitPrice=none, quantity=none, sum=none) %}
       
       {%- for i in range(workData | length) %}
         {%- set item = workData[i] %}
@@ -81,21 +82,21 @@
         {#- Compact list based on the different price slots -#}
         {%- if (i>0) and not(ws.start | as_datetime + timedelta(minutes=ws.minutes)) in startTimes %}
           {%- set ws.minutes = ws.minutes + item.minutes %}
-          {%- set ws.est_kWh = ws.est_kWh + item.est_kWh %}
+          {%- set ws.quantity = ws.quantity + item.quantity %}
           {%- set ws.sum = ws.sum + item.sum %}
         {%- else %}
           {%- if i>0 %}
-            {%- set ns.dict=ns.dict+[dict(start=ws.start, minutes=ws.minutes, kWh_price=ws.kWh_price, est_kWh=ws.est_kWh | round(6), sum=ws.sum | round(6))] %}
+            {%- set ns.dict=ns.dict+[dict(start=ws.start, minutes=ws.minutes, unitPrice=ws.unitPrice, quantity=ws.quantity | round(6), sum=ws.sum | round(6))] %}
           {%- endif %}
           {%- set ws.start=item.start %}
           {%- set ws.minutes=item.minutes %}
-          {%- set ws.kWh_price=item.kWh_price %}
-          {%- set ws.est_kWh=item.est_kWh %}
+          {%- set ws.unitPrice=item.unitPrice %}
+          {%- set ws.quantity=item.quantity %}
           {%- set ws.sum=item.sum %}
         {%- endif %}
         {#- Get the last record stored -#}
         {%- if i==workData | length-1 %}
-          {%- set ns.dict=ns.dict+[dict(start=ws.start, minutes=ws.minutes, kWh_price=ws.kWh_price, est_kWh=ws.est_kWh | round(6), sum=ws.sum | round(6))] %}
+          {%- set ns.dict=ns.dict+[dict(start=ws.start, minutes=ws.minutes, unitPrice=ws.unitPrice, quantity=ws.quantity | round(6), sum=ws.sum | round(6))] %}
         {%- endif %}
       {%- endfor %}
       {{- ns.dict | to_json -}}
@@ -106,45 +107,45 @@
   {%- set status = "ok" -%}
 
   {#- Blank out unwanted date sets. Order is today -> tomorrow -> forecast. If a set is blanked out, subsequent set(s) are also be blanked out -#}
-  {%- if mySensor_today == "" or mySensor_today == [] -%}
-    {%- set mySensor_tomorrow = [] -%}
+  {%- if sensor_today == "" or sensor_today == [] -%}
+    {%- set sensor_tomorrow = [] -%}
   {%- endif -%}
-  {%- if mySensor_tomorrow == "" or mySensor_tomorrow == [] -%}
-    {%- set mySensor_forecast = [] -%}
+  {%- if sensor_tomorrow == "" or sensor_tomorrow == [] -%}
+    {%- set sensor_forecast = [] -%}
   {%- endif -%}
   {# Retrieve energy prices and process data from sensor and align to naming standard #}
-  {%- set hint = hint if hint!="" or mySensor_today is not string else state_attr(mySensor_today, "friendly_name") -%}
+  {%- set hint = hint if hint!="" or sensor_today is not string else state_attr(sensor_today, "friendly_name") -%}
   {%- set myToday = (
                       LoadSensor(
-                          mySensor_today.data if mySensor_today.data is defined else [], 
-                          mySensor_today.timeTag if mySensor_today.timeTag is defined else none, 
-                          mySensor_today.priceTag if mySensor_today.priceTag is defined else none
+                          sensor_today.data if sensor_today.data is defined else [], 
+                          sensor_today.timeTag if sensor_today.timeTag is defined else none, 
+                          sensor_today.priceTag if sensor_today.priceTag is defined else none
                       )
-              if mySensor_today is sequence and mySensor_today is not string else
+              if sensor_today is sequence and sensor_today is not string else
                       LoadSensor(
-                          state_attr(mySensor_today, "raw_today")
+                          state_attr(sensor_today, "raw_today")
                       )
           ) | from_json -%}
   {%- set myTomorrow = (
                       LoadSensor(
-                          mySensor_tomorrow.data if mySensor_tomorrow.data is defined else [], 
-                          mySensor_tomorrow.timeTag if mySensor_tomorrow.timeTag is defined else none, 
-                          mySensor_tomorrow.priceTag if mySensor_tomorrow.priceTag is defined else none
+                          sensor_tomorrow.data if sensor_tomorrow.data is defined else [], 
+                          sensor_tomorrow.timeTag if sensor_tomorrow.timeTag is defined else none, 
+                          sensor_tomorrow.priceTag if sensor_tomorrow.priceTag is defined else none
                       )
-              if mySensor_tomorrow is sequence and mySensor_tomorrow is not string else
+              if sensor_tomorrow is sequence and sensor_tomorrow is not string else
                       LoadSensor(
-                          state_attr(mySensor_tomorrow, "raw_tomorrow")
+                          state_attr(sensor_tomorrow, "raw_tomorrow")
                       )
           ) | from_json -%}
   {%- set myForecast = (
                       LoadSensor(
-                          mySensor_forecast.data if mySensor_forecast.data is defined else [], 
-                          mySensor_forecast.timeTag if mySensor_forecast.timeTag is defined else none, 
-                          mySensor_forecast.priceTag if mySensor_forecast.priceTag is defined else none
+                          sensor_forecast.data if sensor_forecast.data is defined else [], 
+                          sensor_forecast.timeTag if sensor_forecast.timeTag is defined else none, 
+                          sensor_forecast.priceTag if sensor_forecast.priceTag is defined else none
                       )
-              if mySensor_forecast is sequence and mySensor_forecast is not string else
+              if sensor_forecast is sequence and sensor_forecast is not string else
                       LoadSensor(
-                          state_attr(mySensor_forecast, "forecast")
+                          state_attr(sensor_forecast, "forecast")
                       )
           ) | from_json -%}
 
@@ -204,22 +205,22 @@
   {%- if status=="ok" -%}
     {%- set reqUsageSlices = (1 if durationMinutes % usageWindow != 0 else 0) -%}
     {#- Build a khw_usage list if a number is provided instead of a list -#}
-    {%- if kwh_usage is not sequence and kwh_usage is number -%}
-      {%- set tmp = (kwh_usage / durationMinutes) * usageWindow -%}
+    {%- if expectedConsumption is not sequence and expectedConsumption is number -%}
+      {%- set tmp = (expectedConsumption / durationMinutes) * usageWindow -%}
       {%- set tmpSet = namespace(dict = []) -%}  
       {%- for i in range((durationMinutes // usageWindow) | int) -%}
         {%- set tmpSet.dict = tmpSet.dict + [tmp] -%}
       {%- endfor -%}
-      {%- set tmpSet.dict = tmpSet.dict + [(kwh_usage - tmpSet.dict|sum) * (0 if durationMinutes % usageWindow == 0 else (usageWindow / (durationMinutes % usageWindow))) ] -%}
-      {%- set kwh_usage = tmpSet.dict -%}
+      {%- set tmpSet.dict = tmpSet.dict + [(expectedConsumption - tmpSet.dict|sum) * (0 if durationMinutes % usageWindow == 0 else (usageWindow / (durationMinutes % usageWindow))) ] -%}
+      {%- set expectedConsumption = tmpSet.dict -%}
     {%- endif -%}
     {%- set reqUsageSlices = reqUsageSlices + (durationMinutes // usageWindow) -%}
-    {%- set usageLen = kwh_usage | length if kwh_usage is sequence and kwh_usage is not string else 0 -%} 
+    {%- set usageLen = expectedConsumption | length if expectedConsumption is sequence and expectedConsumption is not string else 0 -%} 
     {%- if usageLen==0 -%}
-      {%- set kwh_usage=[] -%}
+      {%- set expectedConsumption=[] -%}
       {%- set usageWindow = 60 -%}
     {%- elif usageLen>reqUsageSlices -%}
-      {%- set kwh_usage=kwh_usage[:reqUsageSlices] -%}
+      {%- set expectedConsumption=expectedConsumption[:reqUsageSlices] -%}
     {%- elif usageLen<reqUsageSlices -%}
       {%- set status="notEnoughKwhPoints" -%}
     {%- endif -%}
@@ -233,7 +234,7 @@
     {%- set timeAdherence = "default" -%}
   {%- endif -%}
   {%- set nowTime                = now() if timeAdherence not in ["strict", "forced"] else earliestDatetime -%}
-
+  
   {#-###################################-#}
   {#- Validate and set earliestDatetime -#}
   {%- set earliestDatetime       = nowTime if earliestDatetime is not defined or earliestDatetime is not datetime or (earliestDatetime < nowTime) else earliestDatetime -%}
@@ -321,15 +322,15 @@
           {%- set timeSet.dict      = [] -%}
           {%- set pricing.value     = 0 -%}
 
-          {%- for i in range(reqUsageSlices * (arrSize+2)) if (totalLen.value<durationMinutes) and (usageLen == 0 or sliceSet.idx < kwh_usage | length) and priceSet.idx < arrSize -%}
+          {%- for i in range(reqUsageSlices * (arrSize+2)) if (totalLen.value<durationMinutes) and (usageLen == 0 or sliceSet.idx < expectedConsumption | length) and priceSet.idx < arrSize -%}
             {%- set workLen         = min(priceSet.left, sliceSet.left, durationMinutes - totalLen.value ) -%}
-            {%- set kwh             = 1 if usageLen == 0 else kwh_usage[sliceSet.idx] -%}
+            {%- set kwh             = 1 if usageLen == 0 else expectedConsumption[sliceSet.idx] -%}
             {%- set kwh_price       = prices[priceSet.idx].price -%}
             {%- set priceFactor     = kwh * workLen / usageWindow -%}
             {%- set tmpValue        = kwh_price * priceFactor -%}
             {%- set pricing.value   = pricing.value + tmpValue -%}
             {%- set timeValue       = priceStartTime + 60 * totalLen.value -%}
-            {%- set timeSet.dict    = timeSet.dict + [ dict(start=timeValue | as_datetime | as_local | string, minutes=workLen, kWh_price=kwh_price, est_kWh=priceFactor | round(6), sum=tmpValue | round(6) ) ] -%}
+            {%- set timeSet.dict    = timeSet.dict + [ dict(start=timeValue | as_datetime | as_local | string, minutes=workLen, unitPrice=kwh_price, quantity=priceFactor | round(6), sum=tmpValue | round(6) ) ] -%}
             
             {%- set priceSet.left   = priceSet.left - workLen -%}
             {%- if priceSet.left == 0 -%}
@@ -348,8 +349,8 @@
           {#-####################################################################-#}
           {%- if (resultCheap.pricing==none or
                   pricing.value<resultCheap.pricing or
-                 (returnFirstBool and pricing.value<=resultCheap.pricing and (resultCheap.priceStartTime is none or priceStartTime<resultCheap.priceStartTime)) or
-                 (not returnFirstBool and pricing.value<=resultCheap.pricing and (resultCheap.priceStartTime is none or priceStartTime>resultCheap.priceStartTime))
+                 (returnFirst and pricing.value<=resultCheap.pricing and (resultCheap.priceStartTime is none or priceStartTime<resultCheap.priceStartTime)) or
+                 (not returnFirst and pricing.value<=resultCheap.pricing and (resultCheap.priceStartTime is none or priceStartTime>resultCheap.priceStartTime))
                  ) and (priceStartTime + 60 * durationMinutes <= latestDatetime) -%}
             {%- set resultCheap.pricing        = pricing.value -%}
             {%- set resultCheap.priceStartTime = priceStartTime -%}
@@ -357,8 +358,8 @@
           {%- endif -%}
           {%- if (resultExpensive.pricing==none or
                   pricing.value>resultExpensive.pricing or
-                 (returnFirstBool and pricing.value>=resultExpensive.pricing and (resultExpensive.priceStartTime is none or priceStartTime<resultExpensive.priceStartTime)) or
-                 (not returnFirstBool and pricing.value>=resultExpensive.pricing and (resultExpensive.priceStartTime is none or priceStartTime>resultExpensive.priceStartTime))
+                 (returnFirst and pricing.value>=resultExpensive.pricing and (resultExpensive.priceStartTime is none or priceStartTime<resultExpensive.priceStartTime)) or
+                 (not returnFirst and pricing.value>=resultExpensive.pricing and (resultExpensive.priceStartTime is none or priceStartTime>resultExpensive.priceStartTime))
                  ) and (priceStartTime + 60 * durationMinutes <= latestDatetime) -%}
             {%- set resultExpensive.pricing        = pricing.value -%}
             {%- set resultExpensive.priceStartTime = priceStartTime -%}
