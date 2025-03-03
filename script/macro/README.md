@@ -93,7 +93,7 @@ When mode is default or details / detailsCompact, the returned value (passed thr
 If mode is details / detailsCompact, follwing data will also be available under the relevant JSONs
 | Parameter | Description |
 |-----------|-------------|
-| explain                    | <ins>Under cheap/expensive JSON</ins><br/>Explaination for calculation to reach price.<br/>Set of [{ start, minutes, unitPrice, quantity },...] covering the whole duration. Start defines when each subset starts, length in minutes of the subset, kWh_price is the corresponding price and quantity is the kWh part of the corresponding slice. kWh_price * quantity is the estimated cost for the slice.|
+| explain                    | <ins>Under cheap/expensive JSON</ins><br/>Explaination for calculation to reach price.<br/>Set of [{ start, minutes, unitPrice, quantity, sum },...] covering the whole duration. Start defines when each subset starts, length in minutes of the subset, unitPrice is the corresponding price per hour and quantity is what is consumed in the corresponding slice. Sum = unitPric * quantity and is the estimated cost for the slice.|
 | prices                     | The full list of prices used for calculation |
 | validate                   | <ins>Under window JSON</ins><br/>JSON with following possible fields:<br/>**validationMode** = Lower case version of _validateData_<br/>**check**          = Status of last validation<br/>**kept**           = Number of kept records<br/>**lastGood**       = Last good record<br/>**invalid**        = First bad record|
 
@@ -104,10 +104,10 @@ For any other mode, the returned value will be a string with the following conte
 
 | Mode      | Description |
 |-----------|-------------|
-|cheapPrice     | String value of price if 1 kW is used each hour during cheapest time. If expectedConsumption is supplied, the amount of kWh is calculated from this. None if no period found |
+|cheapPrice     | String value of price if 1 unit (e.g. 1 kWh) is used each hour during cheapest time. If expectedConsumption is supplied, then that is used instead of 1. None if no period found |
 |cheapStart     | Datetime string of when cheapest time starts |
 |cheapEnd       | Datetime string of when cheapest time ends |
-|expensivePrice | String value of price if 1 kW is used each hour during most expensive time. If expectedConsumption are supplied, the amount of kWh is calculated from this. None if no period found |
+|expensivePrice | String value of price if 1 kW is used each hour during most expensive time. If expectedConsumption are supplied, then that is used instead of 1. None if no period found |
 |expensiveStart | Datetime string of when most expensive time starts |
 |expensiveEnd   | Datetime string of when most expensive time ends |
 
@@ -138,7 +138,7 @@ By default the macro will detect for how long the prices are valid. This is done
 ### Slicing / expectedConsumption
 If data is available on how much power (normally) is expected consumed, expectedConsumption can be added when calling the macro. To allow some variation, an hour is divided into smaller parts (slices). Each part of the expectedConsumption list is
 attributed to a slice, and is only used once during a calculation. If a number is provided instead of a list, the number is assumed to be the total consumption and will be distributed evenly across the duration.<br/>
-The usageWindow must be a whole number between 1 and 60 minutes. This duration is applied to each of the slices listed in expectedConsumption. If the total usageWindow for all slices is less than the duration time, an error will be returned. If expectedConsumption is a number instead of a list, the macro will create its own expectedConsumption list and spread the provided kWh evenly across the duration (considering the usageWindow requested). If expectedConsumption is empty, **an usage of 1 unit (e.g. kWh) is assumed per price window**. If no usageWindow is provided, a window of 60 minutes is assumed; the usageWindow is not coupled to the priceWindow allowing maximum freedom to define each of these.
+The usageWindow must be a whole number between 1 and 60 minutes. This duration is applied to each of the slices listed in expectedConsumption. If the total usageWindow for all slices is less than the duration time, an error will be returned. If expectedConsumption is a number instead of a list, the macro will create its own expectedConsumption list and spread the provided consumption evenly across the duration (considering the usageWindow requested). If expectedConsumption is empty, **an usage of 1 unit (e.g. kWh) is assumed per price window**. If no usageWindow is provided, a window of 60 minutes is assumed; the usageWindow is not coupled to the priceWindow allowing maximum freedom to define each of these.
 | usageWincow | expectedConsumption | Description |
 |-------------|-----------|-------------|
 | included (1-60) | number | _duration_ is interrnally split into small slices with the same length as _usage_window_ and _expectedConsumption_ is split equally amongst these slices|
