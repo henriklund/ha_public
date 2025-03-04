@@ -70,7 +70,7 @@
   
   {#-####################################################################-#}
     {%- macro OptimizeData(workData, priceWindows) -%}
-      {#- Load prices in datetime format for easy comparison -#}
+      {#- Load prices in datetime format for easy comparison, also saves a formatting loop at the end of all code -#}
       {%- set startTimes = priceWindows | map(attribute="start") | map("as_datetime") | map("as_local") | list -%}
       {%- set ns=namespace(dict=[]) %}
       {%- set ws=namespace(start=none, minutes=none, unitPrice=none, quantity=none, sum=none) %}
