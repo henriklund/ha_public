@@ -30,16 +30,18 @@
   {#-####################################################################-#}
     {%- macro LoadSensor(data, timeTag=none, priceTag=none) -%}
       {%- set datePrice = namespace(dateTag=none, date = none, priceTag=none, price = none) -%}
+      {%- set newSensor = namespace(dict=[]) -%}
       {%- if data != none and data | length > 0 -%}
-
+        {# Use dafault tags if no tags were supplied and the default do exist #}
         {%- if timeTag == none and priceTag == none and data[0][defaultTimeTag] is defined and data[0][defaultPriceTag] is defined -%}
           {%- set timeTag = defaultTimeTag -%}
           {%- set priceTag = defaultPriceTag -%}
-        {# If one of the tags is missing, assume we need to look for them both #}
+        {# Start guessing is even just one of the tags is missing #}
         {%- elif timeTag not in data[0] or priceTag not in data[0] -%}
+          {# Check all keys in the fist record #}
           {%- for item in data[0] -%}
-            {# This check should cover both datetime objects, strings and timestamps delivered as "time" #}
             {% set vObj = data[0][item] %}
+            {# This check should cover both datetime objects, strings and timestamps delivered as "time". sanityDate is to safa gaurd against using data that is older than yesterday #}
             {%- if vObj | as_datetime is datetime and (vObj is not number or vObj > sanityDate) -%}
               {%- set tmpTime = vObj | as_datetime | as_timestamp -%}
               {%- set datePrice.dateTag = datePrice.dateTag if datePrice.date!=none and datePrice.date < tmpTime else item -%}
@@ -55,18 +57,15 @@
         {# If no tags were passed on, assume tags found are to be used. If tags were passed on, only use them if the are found in data set #}
         {%- set timeTag  = ("start" if "start" in data[0] else datePrice.dateTag)  if  timeTag is none else (timeTag if timeTag in data[0] else none)%}
         {%- set priceTag = ("price" if "price" in data[0] else datePrice.priceTag) if priceTag is none else (priceTag if priceTag in data[0] else none) -%}
-
-        {%- set newSensor = namespace(dict=[]) -%}
         {# Make up for the odd case where both are identical (not valid result) or one of the tags is None. If not the case, rebuild the set #}
         {%- if timeTag != priceTag and timeTag != none and priceTag != none -%}
+          {# Build a new lsist with the correct named tags #}
           {%- for item in data -%}
             {%- set newSensor.dict = newSensor.dict + [dict(start=(item[timeTag] | as_datetime | as_timestamp ), price=item[priceTag])] -%}
           {%- endfor -%}
         {%- endif -%}
-        {{- newSensor.dict | to_json -}}
-      {%- else -%}
-        {{- [] -}}
       {%- endif -%}
+      {{- newSensor.dict | to_json -}}
     {%- endmacro -%}
   
   {#-####################################################################-#}
