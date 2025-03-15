@@ -8,9 +8,12 @@ Note that any missing parameter will have a default value. Parameters can be add
 the correct order of parameters is mandatory to ensure correct parsing. E.g.:<br/>
   {{- PeriodPrice("sensor.edssensor", duration=timedelta(minutes=90)) -}} 
 
+## Code
+Can be found [here](https://github.com/henriklund/ha_public/blob/main/script/macro/electricity.jinja).
+
 ## Installation
 For now, this is a bit do-it-yourself.<br/>
-In the Home Assistant Config folder (/config) locate the custom_templates subfolder and create a file named electricity.jinja with the content of [this file](https://github.com/henriklund/ha_public/blob/main/script/macro/electricity.jinja) (or you could simply download the file and upload it to your Home Assistant). After this, Home Assistant must be restarted. For examples to put into your configuration.yaml, or use as a template sensor, please follow [this link](https://github.com/henriklund/ha_public/tree/main/script/macro#code-examples).  
+In the Home Assistant Config folder (/config) locate the _custom_templates_ subfolder and create a file named _electricity.jinja_ with the content of [this file](https://github.com/henriklund/ha_public/blob/main/script/macro/electricity.jinja) (or you could simply download the file and upload it to your Home Assistant). After this, Home Assistant must be restarted. For examples to put into your configuration.yaml, or use in a template sensor, please follow [this link](https://github.com/henriklund/ha_public/tree/main/script/macro#code-examples).  
 
 
 ## Parameters
@@ -154,19 +157,19 @@ The usageWindow must be a whole number between 1 and 60 minutes. This duration i
 | not included | not included |  Usage is assumed to be 1 unit (e.g. kWh) per _priceWindow_. No checks are necessary. |
 
 **Note:**<br/>
-- For each hour there are up to three points upon calculation is based; on the hour, the current minute and modulus (duration % hour) before the hour. The majority of iterations will have 2 or (on rare occassions) 1 data points per hour. Other factor that affect number of calculations are, lower _usageWindow_ lower _priceWindow_ and longer _duration. . If in doubt, test the configuration in _Template_ under _Developer tools_ by adding a _**{%- from 'Electricity.jinja' import PeriodPrice -%}**_ in front of the code (see examples below) to get an impression of how the macro performs.
+- For each hour there are up to three points upon calculation is based; on the hour, the current minute and modulus (duration % hour) before the hour. The majority of iterations will have 2 or (on rare occassions) 1 data points per hour. Other factor that affect number of calculations are, lower _usageWindow_ lower _priceWindow_ and longer _duration. . If in doubt, test the configuration in _Template_ under _Developer tools_ by adding a _**{%- from 'electricity.jinja' import PeriodPrice -%}**_ in front of the code (see examples below) to get an impression of how the macro performs.
 - If duration is one hour or less, slicing will provide little if any beenfit. If duration is low (typically 2 hours or less), there _can_ be a gain by applying a _usageWindow_ and a _expectedConsumption_, however, often adjacent price windows will have a difference in pricing so low that the potential saving can be measured in a few cents. Exception from this is for price windows that go low -> high price and vice versa. Dependent on where is the usage cycle power is consumed, viable windows may be returned that otherwise could have been rejected. E.g. a window with 50 cent / kWh  is followed by a 150 cent / kWh window. If duration is 2 hours and consumed power is 4 kWH, this would normally be considered a bad choice since the estimated price would be 400 cents for the duration. However, if measurenments showed that 80% of power was consumed within the first 60 mins, the estimated price would change to 280 which in some cases might be acceptable.<br/>For longer duration, and especially where the consumed power varies to a considerable degree over time, benefits may be seen from using _usageWindow_ and a _expectedConsumption_. However, do also consider the validity of the data; e.g. forecast may not provide as valuable result with a low _usageWindow_ vs day-ahead and a low _usageWindow_.
 
 
 ## Code examples
 ### Get the cheapest hour, within the next 48 hours (ie. using defaults)
-            {% from 'Electricity.jinja' import PeriodPrice %}
+            {% from 'electricity.jinja' import PeriodPrice %}
             {%- set edsSensor         = "sensor.energidataservice" -%}
             {{- PeriodPrice(edsSensor, 
                             hint="Energi Data Service") | from_json -}}
  
 ### Dishwasher must be run at cheapest hour, but be completed by 06:00 tomorrow
-            {% from 'Electricity.jinja' import PeriodPrice %}
+            {% from 'electricity.jinja' import PeriodPrice %}
             {%- set edsSensor         = "sensor.energidataservice" -%}
             {%- set earliestDatetime  = now() -%}
             {#- Add 20min for the normal cycle of dishwasher cooling off and opening door -#}
@@ -179,7 +182,7 @@ The usageWindow must be a whole number between 1 and 60 minutes. This duration i
                             hint="Energi Data Service") | from_json -}}
               
 ### Dishwasher must be run at cheapest hour, but be completed by 06:00 tomorrow. Cascade two integrations for data
-            {% from 'Electricity.jinja' import PeriodPrice %}
+            {% from 'electricity.jinja' import PeriodPrice %}
             {%- set edsSensor         = "sensor.energidataservice" -%}
             {%- set earliestDatetime  = now() -%}
             {#- Add 20min for the normal cycle of dishwasher cooling off and opening door -#}
@@ -212,7 +215,7 @@ The last example can be extended by using additional integrations (e.g. Nordpool
 
 
 ### Get cheapest hour within the next 12 hours
-            {%- from 'Electricity.jinja' import PeriodPrice -%}
+            {%- from 'electricity.jinja' import PeriodPrice -%}
             {%- set edsSensor           = "sensor.energidataservice" -%}
             {%- set earliestDatetime    = now() -%}
             {%- set latestDatetime      = earliestDatetime + 12*60 -%}
@@ -223,7 +226,7 @@ The last example can be extended by using additional integrations (e.g. Nordpool
                             hint="Energi Data Service") | from_json -}}
 
 ### Get cheapest period within the next 12 hours, where power consumption expected is 1.2kWh, distributed (in 15 minute intervals) to be 0.4kWh, 0.3kWh, 0.18kWh, 0.17kWh, 0.1 kWh and 0.05kWh.
-            {%- from 'Electricity.jinja' import PeriodPrice -%}
+            {%- from 'electricity.jinja' import PeriodPrice -%}
             {%- set edsSensor           = "sensor.energidataservice" -%}
             {%- set earliestDatetime    = now() -%}
             {%- set latestDatetime      = earliestDatetime + timedelta(hours=12) -%}
