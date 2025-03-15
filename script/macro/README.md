@@ -93,11 +93,11 @@ When mode is default / details / detailsCompact, the returned value (passed thro
 If mode is details / detailsCompact, follwing data will also be available under the relevant JSONs
 | Parameter | Description |
 |-----------|-------------|
-| explain                    | <ins>Under cheap/expensive JSON</ins><br/>Explaination for calculation to reach price.<br/>Set of [{ start, minutes, unitPrice, quantity, sum },...] covering the whole duration. Start defines when each subset starts, length in minutes of the subset, unitPrice is the corresponding price per hour and quantity is what is consumed in the corresponding slice. Sum = unitPric * quantity and is the estimated cost for the slice.|
+| explain                    | <ins>Under cheap/expensive JSON</ins><br/>Explaination for calculation to reach price.<br/>Set of [{ start, minutes, unitPrice, quantity, sum },...] covering the whole duration. Start defines when each subset starts, length in minutes of the subset, unitPrice is the corresponding price per hour and quantity is what is consumed in the corresponding slice. Sum is unitPrice multiplied by quantity, and is thus the estimated cost for the slice.|
 | prices                     | The full list of prices used for calculation |
 | validate                   | <ins>Under window JSON</ins><br/>JSON with following possible fields:<br/>**validationMode** = Lower case version of _validateData_<br/>**check**          = Status of last validation<br/>**kept**           = Number of kept records<br/>**lastGood**       = Last good record<br/>**invalid**        = First bad record|
 
-If _detailsCompact_ is used, the list in _explain_ will be compacted in accordance to prics irrespectively of the _usageWindow_ or _expectedConsumption_ settings.
+If _detailsCompact_ is used, the list in _explain_ will be compacted in accordance to prices irrespectively of the _usageWindow_ or _expectedConsumption_ settings.
 <br/>
 <br/>
 For any other mode, the returned value will be a string with the following content:
@@ -114,8 +114,8 @@ For any other mode, the returned value will be a string with the following conte
 ## Advanced use
 ### Multiple sensors
 The macro has the ability to get pricing from multiple sensors, although with the requirement of them covering adjacent periods. This allows for instance collection of day-ahead pricing for today / tomorrow / forecast. I.e. sensor1 can provide todays pricing, and sensor2 can provide tomorrows; e.g. this could be the case when using [Strømligning](https://github.com/MTrab/stromligning). If forecast data is available (e.g. you have a sensor that pulls data from [Carnots API](https://www.carnot.dk/), then this data can also be used. However, there are some requirements that must be met:
-- Data obtained from these (up to) three sensors may not overlap, but must be adjacent.
-- The prices must be valid for the same duration (e.g. hour).
+- Data obtained from these (up to) three sensors may _not_ overlap, but must be adjacent.
+- The prices must be valid for the same duration (e.g. each is valid for an hour).
 - The name (entity_id) of the sensor must be listed in sensor_today / sensor_tomorrow / sensor_forecast. Note:
   - if sensor_forecast is set to empty, sensor_forecast data is ignored
   - if sensor_tomorrow is set to empty, both data for sensor_tomorrow as well as sensor_forecast are ignored
