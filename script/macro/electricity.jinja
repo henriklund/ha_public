@@ -13,35 +13,37 @@
                     ) -%}
 
   {# Constants #}
-  {%- set defaultDurationMinNum = 5 -%}
-  {%- set defaultPeriodHrsNum   = 24 -%}
+  {%- set defaultDurationMinNum = 5 -%}         {#- minutes -#} 
+  {%- set defaultPeriodHrsNum   = 24 -%}        {#- hours -#} 
   {%- set defaultTimeTag        = "start" -%}
   {%- set defaultPriceTag       = "price" -%}
-  {%- set sanityDate            = (today_at("00:00") - timedelta(hours=24)) | as_timestamp -%}
+  {#- The following safe guards against loading old data . If e.g. data from yesterday should be usable, simply subtract timedelta(hours = 24) from today_at -#}
+  {%- set sanityDate            = ( today_at("00:00") ) | as_timestamp -%}
 
   {#-####################################################################-#}
   {#-
     Note that macro can be called adding just the sensor_today parameter. Any parameter can be added in any order
-    providing that it is written using the parameter name. When leaving out parameters, this is mandatory to ensure
+    providing that it include the parameter name. When leaving out parameters, this becomes mandatory to ensure
     correct parsing. E.g. {{- PeriodPrice("sensor.edssensor", duration=timedelta(minutes=90)) -}}
 
     Documentation can be found here: https://github.com/henriklund/ha_public/blob/main/script/public/README.md#electricityjinja
   -#}
   {#-####################################################################-#}
+    {#- Simplify parsing by standarding naming inside provided prices -#}
     {%- macro LoadSensor(data, timeTag=none, priceTag=none) -%}
       {%- set datePrice = namespace(dateTag=none, date = none, priceTag=none, price = none) -%}
       {%- set newSensor = namespace(dict=[]) -%}
       {%- if data != none and data | length > 0 -%}
-        {# Use dafault tags if no tags were supplied and the default do exist #}
+        {# Use dafault tags if no tags were supplied and the default exist #}
         {%- if timeTag == none and priceTag == none and data[0][defaultTimeTag] is defined and data[0][defaultPriceTag] is defined -%}
           {%- set timeTag = defaultTimeTag -%}
           {%- set priceTag = defaultPriceTag -%}
-        {# Start guessing is even just one of the tags is missing #}
+        {# Start guessing if just one of the tags are missing #}
         {%- elif timeTag not in data[0] or priceTag not in data[0] -%}
           {# Check all keys in the fist record #}
           {%- for item in data[0] -%}
             {% set vObj = data[0][item] %}
-            {# This check should cover both datetime objects, strings and timestamps delivered as "time". sanityDate is to safa gaurd against using data that is older than yesterday #}
+            {# This check should cover both datetime objects, strings and timestamps delivered as "time". sanityDate is to safe gaurd against using data that is too old #}
             {%- if vObj | as_datetime is datetime and (vObj is not number or vObj > sanityDate) -%}
               {%- set tmpTime = vObj | as_datetime | as_timestamp -%}
               {%- set datePrice.dateTag = datePrice.dateTag if datePrice.date!=none and datePrice.date < tmpTime else item -%}
@@ -57,7 +59,7 @@
         {# If no tags were passed on, assume tags found are to be used. If tags were passed on, only use them if the are found in data set #}
         {%- set timeTag  = ("start" if "start" in data[0] else datePrice.dateTag)  if  timeTag is none else (timeTag if timeTag in data[0] else none)%}
         {%- set priceTag = ("price" if "price" in data[0] else datePrice.priceTag) if priceTag is none else (priceTag if priceTag in data[0] else none) -%}
-        {# Make up for the odd case where both are identical (not valid result) or one of the tags is None. If not the case, rebuild the set #}
+        {# Make up for the odd case where both are identical (consider invalid result) or one of the tags is None. If not the case, rebuild the set #}
         {%- if timeTag != priceTag and timeTag != none and priceTag != none -%}
           {# Build a new lsist with the correct named tags #}
           {%- for item in data -%}
@@ -69,6 +71,7 @@
     {%- endmacro -%}
   
   {#-####################################################################-#}
+    {#- Optimize explanation data by reducing windows where pricing is the same #}
     {%- macro OptimizeData(workData, priceWindows) -%}
       {#- Load prices in datetime format for easy comparison, also saves a formatting loop at the end of all code -#}
       {%- set startTimes = priceWindows | map(attribute="start") | map("as_datetime") | map("as_local") | list -%}
@@ -93,7 +96,7 @@
           {%- set ws.quantity=item.quantity %}
           {%- set ws.sum=item.sum %}
         {%- endif %}
-        {#- Get the last record stored -#}
+        {#- Need to get the last record stored as well :) -#}
         {%- if i==workData | length-1 %}
           {%- set ns.dict=ns.dict+[dict(start=ws.start, minutes=ws.minutes, unitPrice=ws.unitPrice, quantity=ws.quantity | round(6), sum=ws.sum | round(6))] %}
         {%- endif %}
@@ -102,10 +105,9 @@
     {%- endmacro -%}
   
   {#-####################################################################-#}
-  {#- Prepare input parameters -#}
+  {#- Assume all will be well -#}
   {%- set status = "ok" -%}
-
-  {#- Blank out unwanted date sets. Order is today -> tomorrow -> forecast. If a set is blanked out, subsequent set(s) are also be blanked out -#}
+  {#- Blank out (i.e. ignore) unwanted date sets. Order is today -> tomorrow -> forecast. If a set is blanked out, subsequent set(s) are also be blanked out -#}
   {%- if sensor_today == "" or sensor_today == [] -%}
     {%- set sensor_tomorrow = [] -%}
   {%- endif -%}
@@ -169,7 +171,7 @@
   {%- endif -%}
   {%- set priceWindowSeconds = 60 * priceWindow -%}
 
-  {#- Validate price list-#}
+  {#- Validate price list - if so required -#}
   {%- set validateData = validateData | lower if validateData | lower in ["ignore", "prune", "stoponerror"] else "ignore" -%}
   {%- set validate = namespace(check="ok", idx=-1, lastGood=none, this=none) -%}
   {%- if validateData != "ignore" -%}
@@ -200,7 +202,7 @@
   {%- set durationMinutesResidual= durationMinutes % priceWindow -%}
   {%- set durationUnits          = ((durationMinutes // priceWindow) + (1 if durationMinutesResidual > 0 else 0)) | int -%}
 
-  {# Handle kWh usage. Create a usage set if needed. Errors are reported when data does not conform to expectations #}
+  {# Handle expected consumption. Create a usage set if needed. Errors are reported when data does not conform to expectations #}
   {%- if status=="ok" -%}
     {%- set reqUsageSlices = (1 if durationMinutes % usageWindow != 0 else 0) -%}
     {#- Build a khw_usage list if a number is provided instead of a list -#}
@@ -228,14 +230,14 @@
   {%- set arrSize    = prices | length -%}
   {%- set prices_len = arrSize - durationUnits | int + 1 -%}
   
-  {%- set timeAdherence       = timeAdherence | lower %}
+  {%- set timeAdherence   = timeAdherence | lower %}
   {%- if timeAdherence not in ["default", "strict", "forced"] %}
     {%- set timeAdherence = "default" -%}
   {%- endif -%}
-  {%- set nowTime                = now() if timeAdherence not in ["strict", "forced"] else earliestDatetime -%}
   
   {#-###################################-#}
   {#- Validate and set earliestDatetime -#}
+  {%- set nowTime                = now() if timeAdherence not in ["strict", "forced"] else earliestDatetime -%}  
   {%- set earliestDatetime       = nowTime if earliestDatetime is not defined or earliestDatetime is not datetime or (earliestDatetime < nowTime) else earliestDatetime -%}
   {#- Strip microseconds and seconds from time -#}
   {%- set earliestDatetimeMinute = earliestDatetime.minute -%}
@@ -250,21 +252,20 @@
   {%- set latestDatetimeSecond   = latestDatetime.second -%}
   {%- set latestDatetime         = (latestDatetime | as_timestamp | int) -%}
   {%- set latestDatetime         = latestDatetime + 60 * (0 if latestDatetimeMinut == 0 else (priceWindow-latestDatetimeMinut) % priceWindow) - latestDatetimeSecond -%}
-  {#- 
-     Extend latestDatetime in case a duration is provided that exceeds the provided latestDatetime
-     Note: latestDatetime is only extended by as many minutes as the window is exceeded with
-  -#}
+  {#- Extend latestDatetime in case a duration is provided that exceeds the provided latestDatetime
+      Note: latestDatetime is only extended by as many minutes as the window is exceeded by         -#}
   {%- set durationDiff           = max(0, durationMinutes - (latestDatetime - earliestDatetime) // 60) -%}
   {%- set latestDatetime         = latestDatetime + (0 if timeAdherence in ['strict','forced'] else 60 * durationDiff) -%}
 
   {%- set mode                   = mode | lower -%}
-  {%- set mode = mode if mode in [ "default", "details", "detailscompact",
+  {%- set mode = mode
+                      if mode in [ "default", "details", "detailscompact",
                                    "cheapprice", "cheapstart", "cheapend", "ischeapnow", 
-                                   "expensiveprice", "expensivestart", "expensiveend", "isexpensivenow" ] 
-                      else "default" -%}
+                                   "expensiveprice", "expensivestart", "expensiveend", "isexpensivenow" ] else
+                 "default" -%}
 
   {%- if status == "ok" %}
-    {#- If, under 'strict' time adherence, where the provided latestDatetime is in the past, return an error -#}
+    {#- If -under 'strict' time adherence - the provided latestDatetime is in the past, return an error -#}
     {%- set validTime = (timeAdherence != "strict") or ( (timeAdherence == "strict") and (latestDatetime >= nowTime | as_timestamp) ) -%} 
     {%- if not validTime -%} 
       {%- set status="windowInPast" %}
@@ -273,8 +274,8 @@
   
   {#-####################################################################-#}
   {#- Set result name spaces -#}
-  {%- set resultCheap     = namespace(pricing=none, priceStartTime=None, explain=[]) -%}
-  {%- set resultExpensive = namespace(pricing=none, priceStartTime=None, explain=[]) -%}
+  {%- set resultCheap     = namespace(price=none, priceStartTime=None, explain=[]) -%}
+  {%- set resultExpensive = namespace(price=none, priceStartTime=None, explain=[]) -%}
 
   {#-####################################################################-#}
   {#- Only run if we have price data and no error so far -#}
@@ -299,16 +300,17 @@
 
     {%- set totalLen          = namespace(value=0) -%}
     {%- set timeSet           = namespace(dict=[]) -%}
-    {%- set pricing           = namespace(value=0) -%}
+    {%- set price             = namespace(value=0) -%}
 
+    {#- Iterate through all provided prices if they are within the defined window-#}
     {%- for n in range(prices_len) if (n+1==arrSize or earliestDatetime <= prices[n+1].start) and (prices[n].start + priceWindowSeconds <= latestDatetime) -%}
-      {#- Calculat pricing on the hour, at the current minute number as well as at the end of an hour -#}
+      {#- Calculat price on the hour, at the current minute number, and at the end of an hour -#}
       {%- if (earliestDatetime - 60 * earliestDatetimeMinute) == prices[n].start -%}
         {%- set tmpVal = earliestDatetimeMinute % priceWindow -%}
         {%- set loopSet = loopSet + ([] if tmpVal in loopSet else [tmpVal]) -%}
       {%- endif -%}
 
-      {#- Iterate through the possible minute sets -#}
+      {#- Iterate through the minute sets matching the current sequence -#}
       {%- for v in range(loopSet | length) -%}
         {%- set priceStartTime      = prices[n].start + 60 * loopSet[v] -%}
         {%- if earliestDatetime <= priceStartTime -%}
@@ -319,15 +321,16 @@
           
           {%- set totalLen.value    = 0 -%}
           {%- set timeSet.dict      = [] -%}
-          {%- set pricing.value     = 0 -%}
+          {%- set price.value       = 0 -%}
 
+          {#- Ensure to keep calculation aligned if the duration of each slice <> duration of each of the prices -#}
           {%- for i in range(reqUsageSlices * (arrSize+2)) if (totalLen.value<durationMinutes) and (usageLen == 0 or sliceSet.idx < expectedConsumption | length) and priceSet.idx < arrSize -%}
             {%- set workLen         = min(priceSet.left, sliceSet.left, durationMinutes - totalLen.value ) -%}
             {%- set kwh             = 1 if usageLen == 0 else expectedConsumption[sliceSet.idx] -%}
             {%- set kwh_price       = prices[priceSet.idx].price -%}
             {%- set priceFactor     = kwh * workLen / usageWindow -%}
             {%- set tmpValue        = kwh_price * priceFactor -%}
-            {%- set pricing.value   = pricing.value + tmpValue -%}
+            {%- set price.value     = price.value + tmpValue -%}
             {%- set timeValue       = priceStartTime + 60 * totalLen.value -%}
             {%- set timeSet.dict    = timeSet.dict + [ dict(start=timeValue | as_datetime | as_local | string, minutes=workLen, unitPrice=kwh_price, quantity=priceFactor | round(6), sum=tmpValue | round(6) ) ] -%}
             
@@ -346,23 +349,24 @@
             {%- set totalLen.value=totalLen.value + workLen -%}
           {%- endfor -%}
           {#-####################################################################-#}
-          {%- if (resultCheap.pricing==none or
-                  pricing.value<resultCheap.pricing or
-                 (returnFirst and pricing.value<=resultCheap.pricing and (resultCheap.priceStartTime is none or priceStartTime<resultCheap.priceStartTime)) or
-                 (not returnFirst and pricing.value<=resultCheap.pricing and (resultCheap.priceStartTime is none or priceStartTime>resultCheap.priceStartTime))
+          {#- Store an update cheap / expensive price in a namespace if anything is found -#}
+          {%- if (resultCheap.price==none or
+                  price.value<resultCheap.price or
+                 (returnFirst and price.value<=resultCheap.price and (resultCheap.priceStartTime is none or priceStartTime<resultCheap.priceStartTime)) or
+                 (not returnFirst and price.value<=resultCheap.price and (resultCheap.priceStartTime is none or priceStartTime>resultCheap.priceStartTime))
                  ) and (priceStartTime + 60 * durationMinutes <= latestDatetime) -%}
-            {%- set resultCheap.pricing        = pricing.value -%}
+            {%- set resultCheap.price          = price.value -%}
             {%- set resultCheap.priceStartTime = priceStartTime -%}
-            {%- set resultCheap.explain         = timeSet.dict -%}
+            {%- set resultCheap.explain        = timeSet.dict -%}
           {%- endif -%}
-          {%- if (resultExpensive.pricing==none or
-                  pricing.value>resultExpensive.pricing or
-                 (returnFirst and pricing.value>=resultExpensive.pricing and (resultExpensive.priceStartTime is none or priceStartTime<resultExpensive.priceStartTime)) or
-                 (not returnFirst and pricing.value>=resultExpensive.pricing and (resultExpensive.priceStartTime is none or priceStartTime>resultExpensive.priceStartTime))
+          {%- if (resultExpensive.price==none or
+                  price.value>resultExpensive.price or
+                 (returnFirst and price.value>=resultExpensive.price and (resultExpensive.priceStartTime is none or priceStartTime<resultExpensive.priceStartTime)) or
+                 (not returnFirst and price.value>=resultExpensive.price and (resultExpensive.priceStartTime is none or priceStartTime>resultExpensive.priceStartTime))
                  ) and (priceStartTime + 60 * durationMinutes <= latestDatetime) -%}
-            {%- set resultExpensive.pricing        = pricing.value -%}
+            {%- set resultExpensive.price          = price.value -%}
             {%- set resultExpensive.priceStartTime = priceStartTime -%}
-            {%- set resultExpensive.explain         = timeSet.dict -%}
+            {%- set resultExpensive.explain        = timeSet.dict -%}
           {%- endif -%}
         {%- endif -%}
       {%- endfor -%}
@@ -370,21 +374,20 @@
   {%- endif -%}
 
   {#-####################################################################-#}
-  {#- Output result as a string formatted as JSON - this can then be parsed by whatever called the macro -#}
-  {%- set FinalCheapDict     = dict(price=none) if resultCheap.pricing     == -1 or resultCheap.priceStartTime    ==None else dict(startTime =resultCheap.priceStartTime     | as_datetime | as_local | string, endTime =(resultCheap.priceStartTime + durationMinutes*60)     | as_datetime | as_local | string, price = resultCheap.pricing     | round(6)) -%}
-  {%- set FinalExpensiveDict = dict(price=none) if resultExpensive.pricing == -1 or resultExpensive.priceStartTime==None else dict(startTime =resultExpensive.priceStartTime | as_datetime | as_local | string, endTime =(resultExpensive.priceStartTime + durationMinutes*60) | as_datetime | as_local | string, price = resultExpensive.pricing | round(6)) -%}
+  {#- Evaluate result to see if something was found -#}
+  {%- set FinalCheapDict     = dict(price=none) if resultCheap.price     == -1 or resultCheap.priceStartTime    ==None else dict(startTime =resultCheap.priceStartTime     | as_datetime | as_local | string, endTime =(resultCheap.priceStartTime + durationMinutes*60)     | as_datetime | as_local | string, price = resultCheap.price     | round(6)) -%}
+  {%- set FinalExpensiveDict = dict(price=none) if resultExpensive.price == -1 or resultExpensive.priceStartTime==None else dict(startTime =resultExpensive.priceStartTime | as_datetime | as_local | string, endTime =(resultExpensive.priceStartTime + durationMinutes*60) | as_datetime | as_local | string, price = resultExpensive.price | round(6)) -%}
   {%- if (FinalCheapDict.price is none or FinalExpensiveDict.price is none) and status=="ok" -%}
     {%- set status="noWindowFound" -%}
   {%- endif -%}
-
-  {# convert price into human readable (if the should be returned #}
+  {# Convert price into human readable (if the should be returned #}
   {%- if mode in ["details", "detailscompact"] -%}
     {%- set pricesOut = namespace(dict=[]) %}
     {%- for item in prices %}
       {%- set pricesOut.dict = pricesOut.dict + [{'price': item.price, 'start': item.start | as_datetime | as_local | string }] %}
     {%- endfor %}
   {%- endif -%}
-  
+  {#- Build result data -#}
   {%- set resultDetails = dict( pricingWindow    = priceWindow | int,
                                 usageWindow      = usageWindow | int ) -%}
   {%- set resultWindow  = dict( earliestDatetime = earliestDatetime | as_datetime | as_local | string,
@@ -395,6 +398,7 @@
                               ([] if validateData=="ignore" else 
                                (dict(check=validate.check).items() | list +
                                  ([] if validate.check=="ok" else dict(kept=validate.idx, lastGood=(none if validate.lastGood==None else validate.lastGood.start | as_datetime | as_local) | string, invalid=(none if validate.this==None else validate.this.start | as_datetime | as_local) | string).items() | list)))) %}
+  {#- Output result as a string formatted as JSON - this can then be parsed by whatever called the macro -#}
   {%- set result = dict(  window         = dict(resultWindow.items()       | list + ([] if mode not in ["details", "detailscompact"] else resultDetails.items()                         | list)),
                           cheap          = dict(FinalCheapDict.items()     | list + ([] if mode not in ["details", "detailscompact"] else dict(explain=(resultCheap.explain     if mode=="details" else OptimizeData(resultCheap.explain, prices) | from_json)    ).items() | list) + dict(isCheapNow      = none if FinalCheapDict.price    ==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalCheapDict.startTime     | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
                           expensive      = dict(FinalExpensiveDict.items() | list + ([] if mode not in ["details", "detailscompact"] else dict(explain=(resultExpensive.explain if mode=="details" else OptimizeData(resultExpensive.explain, prices) | from_json)).items() | list) + dict(isExpensiveNow  = none if FinalExpensiveDict.price==none else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == FinalExpensiveDict.startTime | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M')).items() | list ),
@@ -403,8 +407,10 @@
                           status         = status ) %}
   {%- set result = dict( result.items() | list +
                         (dict(prices=pricesOut.dict) if mode in ["details", "detailscompact"] else dict()).items() | list +
-                        (dict() if hint == "" else dict(hint = hint)).items() | list ) -%}                      
-                      
+                        (dict() if hint == "" else dict(hint = hint)).items() | list ) -%}
+  {#- Provide result according to selected mode.
+      default / details / detailscompact will return JSON formatted string,
+      anything else will be a string -#}
   {%- if mode == "cheapprice" -%}
     {{- result.cheap.price -}}
   {%- elif mode == "cheapstart" -%}
