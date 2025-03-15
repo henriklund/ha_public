@@ -8,6 +8,11 @@ Note that any missing parameter will have a default value. Parameters can be add
 the correct order of parameters is mandatory to ensure correct parsing. E.g.:<br/>
   {{- PeriodPrice("sensor.edssensor", duration=timedelta(minutes=90)) -}} 
 
+## Installation
+For now, this is a bit do-it-yourself.<br/>
+In the Home Assistant Config folder (/config) locate the custom_templates subfolder and create a file named electricity.jinja with the content of [this file](https://github.com/henriklund/ha_public/blob/main/script/macro/electricity.jinja) (or you could simply download the file and upload it to your Home Assistant). After this, Home Assistant must be restarted. For examples to put into your configuration.yaml, or use as a template sensor, please follow [this link](https://github.com/henriklund/ha_public/tree/main/script/macro#code-examples).  
+
+
 ## Parameters
 Required = *
 | Parameter | Description |
