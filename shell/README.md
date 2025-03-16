@@ -1,8 +1,8 @@
 # reset_network.sh
 
 In Home Assistant OS, place following two files in the /share folder (done either through SSH or using one of the available terminals in Home Assistant):
-- [reset_network.sh](https://github.com/henriklund/Home-Assistant/blob/main/shell/reset_network.sh)
-- [nmcli_cmds](https://github.com/henriklund/Home-Assistant/blob/main/shell/nmcli_cmds)
+- [reset_network.sh](https://github.com/henriklund/ha_public/blob/main/shell/reset_network.sh)
+- [nmcli_cmds](https://github.com/henriklund/ha_public/blob/main/shell/nmcli_cmds)
 
 Remember to make reset_network.sh executable by issuing a _chmod +x reset_network.sh_ in a terminal.
 
