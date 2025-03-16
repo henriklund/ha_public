@@ -1,0 +1,6 @@
+remove ipv4.address
+set ipv4.method auto
+remove ipv4.dns
+remove ipv4.gateway
+save
+quit
