@@ -1,6 +1,9 @@
 # electricity.jinja
 This macro can, with the help of sensors reporting known e.g. energy prices, calculate when, within a given timeframe, the
-cheapest /most expensive period will occur. 
+cheapest /most expensive period will occur.
+
+## Visualization
+Please have a look at an example [here](https://github.com/henriklund/ha_public/tree/main/dashboard/plotly) on how to use Plotly to visualize cheapest / expensive hours in a graph
 
 ## Basic use
 The makro can be called adding just the sensor_today parameter (providing the sensor has a raw_today and even a raw_tomorrow attribute). As such the macro is out-of-the-box capable of handling sensor from e.g. the Nordpool and Energi Data Service integrations. However, as can be seen below, the macro can ingest from other sensors as well, provided necessary information is included in the pararmeters. More about that later.<br/>
