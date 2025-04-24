@@ -1,0 +1,308 @@
+- type: custom:plotly-graph
+  layout_options:
+    grid_columns: full
+  hours_to_show: 12
+  time_offset: 8h
+  config:
+    displaylogo: false
+    scrollZoom: false
+    modeBarButtonsToRemove:
+      - resetScale2d
+      - toImage
+      - lasso2d
+      - select2d
+    displayModeBar: false
+  autorange_after_scroll: true
+  refresh_interval: 5
+  layout:
+    barmode: stack
+    shapes:
+      - type: rect
+        xref: x
+        yref: paper
+        x0: |-
+          $ex {
+            return new Date( Date.now() );
+          }
+        x1: |-
+          $ex {
+            return new Date( hass.states["sensor.elpris_billigste_periode"].attributes["endTime"] );
+          }
+        y0: 0
+        y1: 1
+        fillcolor: yellow
+        opacity: 0.05
+        line:
+          width: 0
+      - type: rect
+        name: Billigst
+        showlegend: true
+        xref: x
+        yref: paper
+        x0: |-
+          $ex {
+            return new Date( hass.states["sensor.elpris_billigste_periode"].state );
+          }
+        x1: |-
+          $ex {
+            const date = new Date( hass.states["sensor.elpris_billigste_periode"].state );
+            date.setMinutes(date.getMinutes() + hass.states["sensor.elpris_billigste_periode"].attributes["duration"] ); 
+            return date
+          }
+        y0: 0
+        y1: 1.1
+        fillcolor: green
+        opacity: 0.2
+        line:
+          width: 0
+      - type: rect
+        name: Dyrest
+        showlegend: true
+        xref: x
+        yref: paper
+        x0: |-
+          $ex {
+            return new Date( hass.states["sensor.elpris_dyreste_periode"].state );
+          }
+        x1: |-
+          $ex {
+            const date = new Date( hass.states["sensor.elpris_dyreste_periode"].state );
+            date.setMinutes(date.getMinutes() + hass.states["sensor.elpris_dyreste_periode"].attributes["duration"] ); 
+            return date
+          }
+        y0: 0
+        y1: 1.1
+        fillcolor: red
+        opacity: 0.2
+        line:
+          width: 0
+    yaxis9:
+      visible: false
+      fixedrange: true
+    yaxis2:
+      title: W
+      rangemode: tozero
+      range:
+        - null
+        - 5000
+      tickformat: .0s
+      fixedrange: true
+    yaxis:
+      title: kr/kWh
+      fixedrange: true
+      tickformat: .1f
+      dtick: 1
+      rangemode: tozero
+      range:
+        - null
+        - 11
+    xaxis:
+      ticks: outside
+      type: date
+      tickmode: auto
+      showgrid: true
+      rangeselector:
+        'y': 1.2
+        buttons:
+          - count: 8
+            step: hour
+          - count: 12
+            step: hour
+          - count: 1
+            step: day
+          - count: 2
+            step: day
+          - count: 7
+            step: day
+  entities:
+    - entity: ''
+      name: Now
+      yaxis: y9
+      showlegend: false
+      line:
+        width: 2
+        dash: dot
+        color: deepskyblue
+      x: $ex [Date.now(), Date.now()]
+      'y':
+        - 0
+        - 1
+    - entity: ''
+      name: Reduktion i tariffer
+      yaxis: y9
+      showlegend: false
+      line:
+        width: 2
+        dash: dot
+        color: red
+      x: >-
+        $ex
+        [hass.states["sensor.aktuel_elpris_tariffer_aendres"].state,
+        hass.states["sensor.aktuel_elpris_tariffer_aendres"].state]
+      'y':
+        - 0
+        - 1
+    - entity: sensor.aktuel_elpris
+      name: Faktisk elpris
+      yaxis: y1
+      showlegend: true
+      hovertemplate: '%{x|%d-%b %H:%M} <br />%{y:.2f} kr/kWh'
+      unit_of_measurement: kr/kWh
+      filters:
+        - filter: y !== null
+      x: $ex xs
+      'y': $ex ys
+      line:
+        width: 2
+        color: orange
+    - entity: sensor.stromligning_current_price_vat
+      name: Elpris (ex. reduk.)
+      yaxis: y1
+      showlegend: true
+      hovertemplate: '%{x|%d-%b %H:%M} <br />%{y:.2f} kr/kWh'
+      unit_of_measurement: kr/kWh
+      filters:
+        - filter: y !== null
+      x: $ex xs
+      'y': $ex ys
+      line:
+        width: 2
+        color: blue
+    - entity: sensor.stromligning_tariffer
+      name: Tariffer/abb.
+      yaxis: y1
+      showlegend: true
+      hovertemplate: '%{x|%d-%b %H:%M} <br />%{y:.2f} kr/kWh'
+      unit_of_measurement: kr/kWh
+      filters:
+        - filter: y !== null
+      x: $ex xs
+      'y': $ex ys
+      line:
+        width: 2
+        color: rgba(255, 255, 0,0.5)
+    - entity: sensor.stromligning_tariffer
+      name: Tariffer/abb. (est.)
+      yaxis: y1
+      showlegend: false
+      hovertemplate: '%{x|%d-%b %H:%M} <br />%{y:.2f} kr/kWh'
+      unit_of_measurement: kr/kWh
+      filters:
+        - filter: y !== null
+      fn: |-
+        $fn ({ meta, vars, hass }) => {
+          var xs = new Array();
+          var ys = new Array();
+          var currentDate = new Date();
+          currentDate.setMinutes(0);
+          
+          var stopDate = new Date();
+          stopDate.setDate(stopDate.getDate() + 7);
+          let tarifChange = Date.parse((hass.states["sensor.aktuel_elpris_tariffer_aendres"].state));
+          let reduction;
+          let hour;
+          let elafgift;
+          while (currentDate <= stopDate) {
+            xs.push(new Date (currentDate));
+            hour = currentDate.getHours();
+            currentDate.setHours(currentDate.getHours() + 1);
+            reduction = currentDate >= tarifChange;
+            elafgift = (reduction ? 0.01 : meta.elafgift);
+            ys.push(  meta.energinet + 
+                      meta.elselskab + 
+                      (meta.elnet_24hrs)[hour] +
+                      elafgift );
+          }
+
+          vars.x = xs;
+          vars.y = ys;
+        }
+      x: $fn ({ vars }) => vars.x
+      'y': $fn ({ vars }) => vars.y
+      line:
+        width: 2
+        color: rgba(255, 255, 0,0.5)
+    - entity: sensor.combined_day_ahead
+      name: Elpris
+      yaxis: y1
+      unit_of_measurement: kr/kWh
+      type: bar
+      showlegend: true
+      hovertemplate: '%{x|%d-%b %H}:00 <br />%{y:.2f} kr/kWh'
+      filter: null
+      fn: |-
+        $fn ({ meta, vars }) => {
+          let xs = [meta.raw_today.slice[0], ...meta.raw_today.map(({ hour }) => {
+              const date = new Date(hour);
+              date.setMinutes(date.getMinutes() + 30); 
+              return date;
+          })];
+          let ys = [meta.raw_today.slice[0], ...meta.raw_today.map(({ price }) => price)];
+
+          if (meta.tomorrow_valid) {
+            // Tilføj raw_tomorrow data til xs og ys, hvis tomorrow_valid er true
+            xs = [...xs, ...meta.raw_tomorrow.map(({ hour }) => {
+              const date = new Date(hour);
+              date.setMinutes(date.getMinutes() + 30); 
+              return date;
+          })];
+            ys = [...ys, ...meta.raw_tomorrow.map(({ price }) => price)];
+          }
+
+          vars.marker_color = ys.map(price => {
+            if (price <= 2) return 'green'; 
+            if (price <= 3) return '#9ACD32';
+            if (price <= 3.5) return 'yellow';
+            if (price <= 4) return 'orange';
+            if (price <= 5) return 'red';
+            return 'darkred'; 
+          });
+
+          vars.x = xs;
+          vars.y = ys;
+        }
+      x: $fn ({ vars }) => vars.x
+      'y': $fn ({ vars }) => vars.y
+      marker:
+        color: $fn ({ vars }) => vars.marker_color
+    - entity: sensor.combined_day_ahead
+      name: Forecast
+      yaxis: y1
+      unit_of_measurement: kr/kWh
+      fill: tozeroy
+      fillcolor: rgba(173, 216, 230,0.25)
+      line:
+        color: transparent
+        width: 0
+      showlegend: true
+      hovertemplate: '%{x|%d-%b %H}:00 <br />%{y:.2f} kr/kWh'
+      filter: null
+      fn: |-
+        $fn ({ meta, vars }) => {
+          let xs = [meta.forecast.slice[0], ...meta.forecast.map(({ hour }) => {
+              const date = new Date(hour);
+              date.setMinutes(date.getMinutes() + 0); 
+              return date;
+          })];
+          let ys = [meta.forecast.slice[0], ...meta.forecast.map(({ price }) => price)];
+
+          vars.marker_color = ys.map(price => {
+            if (price <= 2) return 'green'; 
+            if (price <= 3) return '#9ACD32';
+            if (price <= 3.5) return 'yellow';
+            if (price <= 4) return 'orange';
+            if (price <= 5) return 'red';
+            return 'darkred'; 
+          });
+
+          vars.x = xs;
+          vars.y = ys;
+        }
+      x: $fn ({ vars }) => vars.x
+      'y': $fn ({ vars }) => vars.y
+      marker:
+        color: $fn ({ vars }) => vars.marker_color
+    - entity: sensor.combined_day_ahead
+      fn: $ex vars.title = meta.source
+      visible: false
+  title: $ex vars.title
