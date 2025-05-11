@@ -1,0 +1,2530 @@
+#===========================================================================================================
+substitutions:
+  device_name: nilan
+  friendly_name: "Nilan"
+  model: "Nilan Compfort 302 Top"
+  device_description: "Heat recovery ventilation system control"
+  modbus_ctrl_id: nilan_modbus
+  ssid_prefix: Nilan-modbus
+#===========================================================================================================
+
+
+
+#===========================================================================================================
+esphome:
+  name: ${device_name}-modbus
+  friendly_name: ${friendly_name} - Modbus
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+#===========================================================================================================
+
+
+
+#===========================================================================================================
+# Enable logging
+logger:
+  level: INFO
+
+debug:
+  update_interval: 5s
+#===========================================================================================================
+
+
+
+#===========================================================================================================
+ota:
+  - platform: esphome
+    password: !secret esphomeOTA
+#===========================================================================================================
+
+
+
+#===========================================================================================================
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  manual_ip:
+    static_ip: !secret staticIPnilan
+    gateway: !secret gateway
+    subnet: !secret subnet
+  reboot_timeout: 3min
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: ${ssid_prefix} Fallback Hotspot
+    password: !secret captivePassword
+
+captive_portal:
+#===========================================================================================================
+
+
+
+#===========================================================================================================
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: Europe/Copenhagen
+    servers: !secret server_sntp_time
+    update_interval: 5s
+#===========================================================================================================
+
+
+
+#===========================================================================================================
+mqtt:
+  broker: !secret mqtt_ip
+  port: !secret mqtt_port
+  username: !secret mqtt_user
+  password: !secret mqtt_password
+  client_id: ${device_name}
+#===========================================================================================================
+
+
+
+#===========================================================================================================
+web_server:
+  port: 80
+  version: 3
+  auth:
+    username: !secret webserver_user
+    password: !secret webserver_pwd
+#===========================================================================================================
+
+
+
+#===========================================================================================================
+uart:
+  #Adjust where applicable
+  id: mbus
+  tx_pin: GPIO16
+  rx_pin: GPIO17
+  baud_rate: 19200
+  parity: EVEN
+  data_bits: 8
+  stop_bits: 1
+
+modbus:
+  send_wait_time: 50ms
+  id: modbus1
+
+modbus_controller:
+  - id: ${modbus_ctrl_id}
+    ## the Modbus device addr
+    address: 30
+    modbus_id: modbus1
+    setup_priority: -10
+    #command_throttle: 100ms
+    #command_throttle: 20ms
+    command_throttle: 10ms
+    update_interval: 1s
+#===========================================================================================================
+
+
+
+#===========================================================================================================
+sensor:
+#===== System =====
+  - platform: uptime
+    name: ${friendly_name} controller uptime
+    type: seconds
+    update_interval: 10s
+    disabled_by_default: false
+  - platform: wifi_signal
+    name:  ${friendly_name} controller WiFi signal
+    update_interval: 10s
+    entity_category: "diagnostic"
+    disabled_by_default: false
+  - platform: debug
+    free:
+      name: ${friendly_name} controller heap free
+    block:
+      name: ${friendly_name} controller heap max block
+    loop_time:
+      name: ${friendly_name} controller loop time
+
+#===== Custom fields =====
+  - platform: template
+    name: ${friendly_name} time drift
+    id: time_drift
+    unit_of_measurement: "sec."
+    entity_category: diagnostic
+    update_interval: 5s
+    accuracy_decimals: 0
+    disabled_by_default: false
+    lambda: |-
+      struct tm tm{};
+      memset(&tm, 0, sizeof(struct tm));
+      strptime(id(time_date_time).state.c_str(),"%Y-%m-%d %H:%M:%S", &tm);
+      int deviceTime = mktime(&tm);
+
+      memset(&tm, 0, sizeof(struct tm));
+      char buffer [80];
+      id(sntp_time).now().strftime(buffer,80,"%Y-%m-%d %H:%M:%S");
+
+      strptime(std::string(buffer).c_str(),"%Y-%m-%d %H:%M:%S", &tm);
+      int server = mktime(&tm);
+
+      int tdiff = server - deviceTime;
+      if ( ( tdiff > 32000000 ) || ( tdiff < -32000000 ) ) {
+        tdiff = 0;
+      }
+      return (tdiff);
+#=============================================================================================
+# Heat expelled vs ingested by house (positive means that more heat is expelled than ingested)
+# Postitive number is generelly bad in winter and good in summer. Only exception is for room
+#   where a high T10 in winter is preferred while it should be low in the summer
+  - platform: template
+    name: "Calculated difference - external exhaust and inlet"
+    id: calculated_value_external_inlet_exhaust
+    icon: mdi:thermometer
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    disabled_by_default: false
+    lambda: 'return id(input_t4_outlet).state - id(input_t8_outdoor).state;'
+  - platform: template
+    name: "Calculated difference - room exhaust and inlet"
+    id: calculated_value_room_inlet_exhaust
+    icon: mdi:thermometer
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    disabled_by_default: false
+    lambda: 'return id(input_t10_extern).state - id(input_t7_inlet).state;'
+  - platform: template
+    name: "Calculated difference - heater exhaust and inlet"
+    id: calculated_value_heater_inlet_exhaust
+    icon: mdi:thermometer
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    disabled_by_default: false
+    lambda: 'return id(input_t3_exhaust).state - id(input_t7_inlet).state;'
+
+#===== Input registers =====
+  - platform: modbus_controller
+    id: bus_version
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Protocol version number'
+    address: 0
+    register_type: read
+    value_type: U_WORD
+    entity_category: "diagnostic"
+    disabled_by_default: true
+    skip_updates: 60
+
+  - platform: modbus_controller
+    id: input_t0_controller
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T0 controller'
+    address: 200
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: input_t1_intake
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T1 intake'
+    address: 201
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    disabled_by_default: true
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+
+  - platform: modbus_controller
+    id: input_t2_inlet
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T2 inlet'
+    address: 202
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: input_t3_exhaust
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T3 exhaust'
+    address: 203
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: input_t4_outlet
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T4 outlet'
+    address: 204
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: input_t5_cond
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T5 condenser'
+    address: 205
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    disabled_by_default: true
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+
+  - platform: modbus_controller
+    id: input_t6_evap
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T6 evaporator'
+    address: 206
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    disabled_by_default: true
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+
+  - platform: modbus_controller
+    id: input_t7_inlet
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T7 inlet'
+    address: 207
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: input_t8_outdoor
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T8 outdoor'
+    address: 208
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: input_t9_heater
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T9 heater'
+    address: 209
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: input_t10_extern
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T10 extern'
+    address: 210
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: input_t11_top
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T11 top'
+    address: 211
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    disabled_by_default: true
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+
+  - platform: modbus_controller
+    id: input_t12_bottom
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T12 bottom'
+    address: 212
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    disabled_by_default: true
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+
+  - platform: modbus_controller
+    id: input_t13_return
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T13 return'
+    address: 213
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    disabled_by_default: true
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+
+  - platform: modbus_controller
+    id: input_t14_supply
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T14 supply'
+    address: 214
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    disabled_by_default: true
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+
+  - platform: modbus_controller
+    id: input_t15_room
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T15 room'
+    address: 215
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: input_t16
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T16'
+    address: 216
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    disabled_by_default: true
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+
+  - platform: modbus_controller
+    id: input_t17
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'T17'
+    address: 217
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    disabled_by_default: true
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+
+  - platform: modbus_controller
+    id: input_rh
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'RH'
+    address: 221
+    register_type: read
+    value_type: U_WORD
+    unit_of_measurement: '%'
+    device_class: humidity
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+    disabled_by_default: false
+    on_value: 
+      - lambda: !lambda |-
+          int iValue = (int(x+5) / 10);
+          int temp = int(id(input_t10_extern).state + 0.5f) - 16;
+          int eval1[] = {6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6};
+          int eval2[] = {6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6};
+          int eval3[] = {6, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 5, 6};
+          int eval4[] = {6, 5, 5, 4, 3, 3, 3, 2, 2, 3, 4, 5, 6};
+          int eval5[] = {5, 5, 4, 3, 2, 1, 1, 1, 2, 3, 4, 5, 6};
+          int eval6[] = {5, 4, 3, 2, 1, 1, 1, 2, 2, 3, 4, 5, 6};
+          int eval7[] = {5, 4, 3, 2, 1, 1, 1, 2, 3, 4, 5, 5, 6};
+          int eval8[] = {5, 4, 2, 2, 2, 2, 2, 3, 4, 5, 5, 5, 6};
+          int eval9[] = {6, 5, 4, 3, 3, 3, 3, 4, 5, 5, 6, 6, 6};
+          int evalOther[] = {6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6};
+
+          std::string words[] = { "Excellent", "Fine", "Moderate","Poor", "Very Poor", "Severe" };
+          int result = 6;
+
+          if ((temp >= 0 ) && (temp <= 12)) {
+            switch(iValue) {
+              case 1:
+                result = eval1[temp];
+                break;
+              case 2:
+                result = eval2[temp];
+                break;
+              case 3:
+                result = eval3[temp];
+                break;
+              case 4:
+                result = eval4[temp];
+                break;
+              case 5:
+                result = eval5[temp];
+                break;
+              case 6:
+                result = eval6[temp];
+                break;
+              case 7:
+                result = eval7[temp];
+                break;
+              case 8:
+                result = eval8[temp];
+                break;
+              case 9:
+                result = eval9[temp];
+                break;
+              default:
+                result = evalOther[temp];
+            }
+          }
+          id(aqi_humidity).publish_state(words[result-1]);
+# Ref. https://www.breeze-technologies.de/blog/calculating-an-actionable-indoor-air-quality-index/
+
+  - platform: modbus_controller
+    id: input_co2
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'CO2'
+    address: 222
+    register_type: read
+    value_type: U_WORD
+    unit_of_measurement: 'ppm'
+    device_class: carbon_dioxide
+    disabled_by_default: true
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+    on_value: 
+      - lambda: !lambda |-
+          id(aqi_co2).publish_state( (x < 400) ? "Excellent" : 
+                                     (x < 1000) ? "Fine" : 
+                                     (x < 1500) ? "Moderate" :
+                                     (x < 2000) ? "Poor" :
+                                     (x < 5000) ? "Very Poor" :
+                                     "Severe");
+
+  - platform: modbus_controller
+    id: alarm_status_no
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm state bit mask - number'
+    address: 400
+    register_type: read
+    value_type: U_WORD
+    bitmask: 3
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: control_secinstate
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Actual - time in state'
+    address: 1003
+    register_type: read
+    value_type: U_WORD
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airflow_sincefiltday
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Days since filter change'
+    address: 1103
+    register_type: read
+    value_type: U_WORD
+    icon: mdi:calendar-arrow-left
+    unit_of_measurement: 'days'
+    skip_updates: 300
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airflow_tofiltday
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Days to filter change'
+    address: 1104
+    register_type: read
+    value_type: U_WORD
+    icon: mdi:calendar-arrow-right
+    unit_of_measurement: 'days'
+    skip_updates: 300
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airtemp_tempinletset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Inlet temperature'
+    address: 1201
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airtemp_tempcontro
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Actual - controlled temperature'
+    address: 1202
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airtemp_temproom
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Actual - room temperature'
+    address: 1203
+    register_type: read
+    value_type: S_WORD
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    disabled_by_default: false
+    #disabled_by_default: true
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    skip_updates: 2
+
+  - platform: modbus_controller
+    id: airtemp_effpct
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'AirTemp eff.pct.'
+    address: 1204
+    register_type: read
+    value_type: U_WORD
+    unit_of_measurement: '%'
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 2
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airtemp_capset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Requested capacity'
+    address: 1205
+    register_type: read
+    value_type: U_WORD
+    unit_of_measurement: '%'
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 0
+#    disabled_by_default: false
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: airtemp_capact
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Actual capacity'
+    address: 1206
+    register_type: read
+    value_type: U_WORD
+    unit_of_measurement: '%'
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 0
+#    disabled_by_default: false
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: display_attr_line_1
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Display attr. line 1'
+    address: 2006
+    register_type: read
+    value_type: U_WORD
+    disabled_by_default: true
+    #disabled_by_default: false
+
+  - platform: modbus_controller
+    id: display_attr_line_2
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Display attr. line 2'
+    address: 2011
+    register_type: read
+    value_type: U_WORD
+    disabled_by_default: true
+    #disabled_by_default: false
+
+#===== Holding registers =====
+  - platform: modbus_controller
+    id: bus_address
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Protocol node address'
+    address: 0
+    register_type: holding
+    value_type: U_WORD
+    disabled_by_default: true
+    skip_updates: 5
+
+  - platform: modbus_controller
+    id: output_exhaustspeed
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Output exhaust speed'
+    address: 200
+    register_type: holding
+    value_type: U_WORD
+    unit_of_measurement: '%'
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 0
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: output_inletspeed
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Output inlet speed'
+    address: 201
+    register_type: holding
+    value_type: U_WORD
+    unit_of_measurement: '%'
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 0
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: output_airheatcap
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Output air heater capacity'
+    address: 202
+    register_type: holding
+    value_type: U_WORD
+    unit_of_measurement: '%'
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 0
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_cenheatcap
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Central heater capacity'
+    address: 203
+    register_type: holding
+    value_type: U_WORD
+    unit_of_measurement: '%'
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 0
+    skip_updates: 2
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_cprcap
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Compresor capacity'
+    address: 204
+    register_type: holding
+    value_type: U_WORD
+    unit_of_measurement: '%'
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 0
+    skip_updates: 2
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_earthspeed
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Earth tube air intake fan speed'
+    address: 205
+    register_type: holding
+    value_type: U_WORD
+    unit_of_measurement: '%'
+    filters:
+    - multiply: 0.01
+    accuracy_decimals: 0
+    skip_updates: 2
+    disabled_by_default: true
+
+
+binary_sensor:
+#===== System =====
+  - platform: status
+    name: ${friendly_name} controller status
+
+#===== Custom fields =====
+  - platform: template
+    name: "User function activated"
+    id: user_function_activated
+    disabled_by_default: false
+    lambda: |-
+      return ( (id(output_userfunc).state   || id(program_userfuncact).state  != "N/A") ||
+               (id(output_userfunc_2).state || id(program_user2funcact).state != "N/A") );
+
+#===== Input registers =====
+  - platform: modbus_controller
+    id: input_userfunc
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - User function'
+    address: 100
+    register_type: read
+    bitmask: 1
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: input_airfilter
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - filter'
+    address: 101
+    register_type: read
+    bitmask: 1
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: input_dooropen
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - door open'
+    address: 102
+    register_type: read
+    bitmask: 1
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: input_smoke
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - smoke'
+    address: 103
+    register_type: read
+    bitmask: 1
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: input_motorthermo
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - motor thermo fuse'
+    address: 104
+    register_type: read
+    bitmask: 1
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: input_frost_overht
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - frost overheat'
+    address: 105
+    register_type: read
+    bitmask: 1
+    disabled_by_default: false
+    #disabled_by_default: true
+
+  - platform: modbus_controller
+    id: input_airflow
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - airflow'
+    address: 106
+    register_type: read
+    bitmask: 1
+    disabled_by_default: false
+    #disabled_by_default: true
+
+  - platform: modbus_controller
+    id: input_p_hi
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - high pressure'
+    address: 107
+    register_type: read
+    bitmask: 1
+    disabled_by_default: false
+    #disabled_by_default: true
+
+  - platform: modbus_controller
+    id: input_p_lo
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - low pressure'
+    address: 108
+    register_type: read
+    bitmask: 1
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: input_boil
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - Hot water boiling'
+    address: 109
+    register_type: read
+    bitmask: 1
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: input_3waypos
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - Hot water 3-way valve position'
+    address: 110
+    register_type: read
+    bitmask: 1
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: input_defrosthg
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - Hotgas defrost type selection'
+    address: 111
+    register_type: read
+    bitmask: 1
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: input_defrost
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - Defrost thermostat'
+    address: 112
+    register_type: read
+    bitmask: 1
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: input_userfunc_2
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm - User function 2'
+    address: 113
+    register_type: read
+    bitmask: 1
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: input_damperclosed
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Air damper closed position'
+    address: 114
+    register_type: read
+    bitmask: 1
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: input_damperopen
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Air damper opened position'
+    address: 115
+    register_type: read
+    bitmask: 1
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: control_runact
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Actual - on/off state'
+    address: 1000
+    register_type: read
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airtemp_issummer
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Is summer'
+    address: 1200
+    register_type: read
+    skip_updates: 60
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: display_led_1
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Display LED 1'
+    address: 2000
+    register_type: read
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: display_led_2
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Display LED 2'
+    address: 2001
+    register_type: read
+    disabled_by_default: true
+
+#===== Holding registers =====
+  - platform: modbus_controller
+    id: output_airflap
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Air flap'
+    address: 100
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_smokeflap
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Fire/Smoke flap'
+    address: 101
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_bypassopen
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Output bypass open'
+    address: 102
+    register_type: holding
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: output_bypassclose
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Output bypass close'
+    address: 103
+    register_type: holding
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: output_aircircpump
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Air heat circulation pump'
+    address: 104
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_airheatallow
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Air heating selected'
+    address: 105
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_airheat_1
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Air heater relays - 1'
+    address: 106
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_airheat_2
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Air heater relays - 2'
+    address: 107
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_airheat_3
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Air heater relays - 3'
+    address: 108
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_compressor
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Compressor'
+    address: 109
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_compressor_2
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Compressor 2'
+    address: 110
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_4waycool
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: '4-way valve'
+    address: 111
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_hotgasheat
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Hotgas valve - heat'
+    address: 112
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_hotgascool
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Hotgas valve - cool'
+    address: 113
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_condopen
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Air condenser active'
+    address: 114
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_condclose
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Air condenser inactive'
+    address: 115
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_waterheat
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Hot water heater'
+    address: 116
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_3wayvalve
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Hot water 3-way valve'
+    address: 117
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_cencircpump
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'EK circulation pump'
+    address: 118
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_cenheat_1
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'EK heater relays - 1'
+    address: 119
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_cenheat_2
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'EK heater relays - 2'
+    address: 120
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_cenheat_3
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'EK heater relays - 3'
+    address: 121
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_cenheatext
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'External radiator heat'
+    address: 122
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_userfunc
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function active'
+    address: 123
+    register_type: holding
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: output_userfunc_2
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function active 2'
+    address: 124
+    register_type: holding
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: output_defrosting
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Defrosting function active'
+    address: 125
+    register_type: holding
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: output_alarmrelay
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm relay state'
+    address: 126
+    register_type: holding
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: output_preheat
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Preheater / earth tube activation'
+    address: 127
+    register_type: holding
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: alarm_status
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm state bit mask'
+    address: 400
+    register_type: read
+    disabled_by_default: false
+
+
+button:
+  - platform: output
+    name: KEY1 ESC
+    id: device_button_esc_button
+    output: display_keycode_esc
+    duration: 200ms
+    disabled_by_default: true
+  - platform: output
+    name: KEY2 UP
+    id: device_button_up_button
+    output: display_keycode_up
+    duration: 200ms
+    disabled_by_default: true
+  - platform: output
+    name: KEY3 DOWN
+    id: device_button_down_button
+    output: display_keycode_down
+    duration: 200ms
+    disabled_by_default: true
+  - platform: output
+    name: KEY4 ENTER
+    id: device_button_enter_button
+    output: display_keycode_enter
+    duration: 200ms
+    disabled_by_default: true
+  - platform: output
+    name: KEY5 ON
+    id: device_button_on_button
+    output: display_keycode_on
+    duration: 200ms
+    disabled_by_default: true
+  - platform: output
+    name: KEY6 OFF
+    id: device_button_off_button
+    output: display_keycode_off
+    duration: 200ms
+    disabled_by_default: true
+
+  - platform: template
+    id: device_time_sync_button
+    name: ${friendly_name} time sync
+    disabled_by_default: true
+    entity_category: diagnostic
+    on_press: 
+      then:
+        - lambda: |-
+            if ( id(time_drift).state != 0 ) {
+              struct tm tm{};
+              memset(&tm, 0, sizeof(struct tm));
+              char buffer [80];
+
+              id(sntp_time).now().strftime(buffer, 80, "%Y-%m-%d %H:%M:%S");
+              strptime(std::string(buffer).c_str(), "%Y-%m-%d %H:%M:%S", &tm);
+
+              ESP_LOGI("Time", "New time to be set: %d-%d-%d %d:%d:%d",tm.tm_year+1900,tm.tm_mon+1,tm.tm_mday,tm.tm_hour,tm.tm_min,tm.tm_sec);
+              auto callsec = id(time_second).make_call();
+              auto callmin = id(time_minute).make_call();
+              auto callhour = id(time_hour).make_call();
+              auto callday = id(time_day).make_call();
+              auto callmon = id(time_month).make_call();
+              auto callyear = id(time_year).make_call();
+
+              callsec.set_value(tm.tm_sec);
+              callsec.perform();
+              callmin.set_value(tm.tm_min);
+              callmin.perform();
+              callhour.set_value(tm.tm_hour);
+              callhour.perform();
+              callday.set_value(tm.tm_mday);
+              callday.perform();
+              callmon.set_value(tm.tm_mon+1);
+              callmon.perform();
+              callyear.set_value(tm.tm_year+1900);
+              callyear.perform();
+            }
+
+
+output:
+#===== Holding registers =====
+  - platform: modbus_controller
+    id: display_keycode_esc
+    address: 2000
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    write_lambda: |-
+      uint16_t value = (x == 1) ? 0x01 : 0 ;
+      return value;
+  - platform: modbus_controller
+    id: display_keycode_up
+    address: 2000
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    write_lambda: |-
+      uint16_t value = (x == 1) ? 0x02 : 0 ;
+      return value;
+  - platform: modbus_controller
+    id: display_keycode_down
+    address: 2000
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    write_lambda: |-
+      uint16_t value = (x == 1) ? 0x04 : 0 ;
+      return value;
+  - platform: modbus_controller
+    id: display_keycode_enter
+    address: 2000
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    write_lambda: |-
+      uint16_t value = (x == 1) ? 0x08 : 0 ;
+      return value;
+
+  - platform: modbus_controller
+    id: display_keycode_off
+    address: 2000
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    write_lambda: |-
+      uint16_t value = (x == 1) ? 0x10 : 0 ;
+      return value;
+  - platform: modbus_controller
+    id: display_keycode_on
+    address: 2000
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    write_lambda: |-
+      uint16_t value = (x == 1) ? 0x20 : 0 ;
+      return value;
+
+
+number:
+#===== Holding registers =====
+  - platform: modbus_controller
+    id: time_second
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Time - second'
+    address: 300
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    internal: true
+    min_value: 0
+    max_value: 59
+    step: 1
+    disabled_by_default: false
+  - platform: modbus_controller
+    id: time_minute
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Time - minute'
+    address: 301
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    internal: true
+    min_value: 0
+    max_value: 59
+    step: 1
+    disabled_by_default: false
+  - platform: modbus_controller
+    id: time_hour
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Time - hour'
+    address: 302
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    internal: true
+    min_value: 0
+    max_value: 23
+    step: 1
+    disabled_by_default: false
+  - platform: modbus_controller
+    id: time_day
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Time - day'
+    address: 303
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    internal: true
+    min_value: 1
+    max_value: 31
+    step: 1
+    disabled_by_default: false
+  - platform: modbus_controller
+    id: time_month
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Time - month'
+    address: 304
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    internal: true
+    min_value: 1
+    max_value: 12
+    step: 1
+    disabled_by_default: false
+  - platform: modbus_controller
+    id: time_year
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Time - year'
+    address: 305
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    internal: true
+    min_value: 2024
+    max_value: 2099
+    step: 1
+    disabled_by_default: false
+  - platform: modbus_controller
+    id: program_usertempset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function - temperature'
+    address: 604
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    #CHECK THIS
+    min_value: 5
+    max_value: 30
+    step: 1
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: program_useroffset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function - temperature (offset)'
+    address: 605
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    disabled_by_default: true
+    #CHECK THIS
+    min_value: 0
+    max_value: 5
+    step: 1
+
+  - platform: modbus_controller
+    id: program_user2tempset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function 2 - temperature'
+    address: 614
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    disabled_by_default: true
+    #CHECK THIS
+    min_value: 5
+    max_value: 30
+    step: 1
+
+  - platform: modbus_controller
+    id: program_user2offset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function 2 - temperature (offset)'
+    address: 615
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    disabled_by_default: true
+    #CHECK THIS
+    min_value: 0
+    max_value: 5
+    step: 1
+
+  - platform: modbus_controller
+    id: control_tempset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Control - temperature'
+    address: 1004
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    #CHECK THIS
+    min_value: 5
+    max_value: 30
+    step: 1
+    multiply: 100
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: control_servicepct
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Control - service mode capacity'
+    address: 1006
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    icon: mdi:percent
+    unit_of_measurement: '%'
+    #CHECK THIS
+    min_value: 10
+    max_value: 100
+    step: 1
+    multiply: 100
+    disabled_by_default: true
+    internal: true
+
+  - platform: modbus_controller
+    id: airtemp_tempminsum
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Temperature - inlet - min. summer'
+    address: 1201
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    min_value: 10
+    max_value: 45
+    step: 1
+    multiply: 100
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airtemp_tempminwin
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Temperature - inlet - min. winter'
+    address: 1202
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    min_value: 10
+    max_value: 45
+    step: 1
+    multiply: 100
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airtemp_tempmaxsum
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Temperature - inlet - max. summer'
+    address: 1203
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    min_value: 10
+    max_value: 45
+    step: 1
+    multiply: 100
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airtemp_tempmaxwin
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Temperature - inlet - max. winter'
+    address: 1204
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    min_value: 10
+    max_value: 45
+    step: 1
+    multiply: 100
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airtemp_tempsummer
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Temperature - summer/winter limit'
+    address: 1205
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    min_value: 10
+    max_value: 30
+    step: 1
+    multiply: 100
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airtemp_nightset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Temperature - free energy night cooling room setpoint'
+    address: 1207
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    disabled_by_default: true
+    icon: mdi:thermometer
+    unit_of_measurement: '°C'
+    device_class: temperature
+    min_value: 10
+    max_value: 30
+    step: 1
+    multiply: 100
+
+  - platform: modbus_controller
+    id: airqual_rh_limlo
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'RH - humidity limit for low ventilation'
+    address: 1912
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    icon: mdi:water-percent
+    unit_of_measurement: '%'
+    device_class: humidity
+    min_value: 15
+    max_value: 45
+    step: 1
+    multiply: 100
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airqual_rh_timeout
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'RH - humidity max. time on high ventilation'
+    address: 1913
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    icon: mdi:av-timer
+    unit_of_measurement: 'min.'
+    min_value: 0
+    max_value: 180
+    step: 5
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airqual_co2_limlo
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'CO2 - limit for normal ventilation'
+    address: 1921
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    disabled_by_default: true
+    icon: mdi:av-timer
+    unit_of_measurement: 'ppm'
+    min_value: 400
+    max_value: 750
+    step: 1
+
+  - platform: modbus_controller
+    id: airqual_co2_limlhi
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'CO2 - limit for high ventilation'
+    address: 1922
+    register_type: holding
+    value_type: U_WORD
+    use_write_multiple: true
+    disabled_by_default: true
+    icon: mdi:av-timer
+    unit_of_measurement: 'ppm'
+    min_value: 650
+    max_value: 800
+    step: 1
+
+
+text_sensor:
+  - platform: template
+    id: aqi_humidity
+    name: "Air Quality Index - Humidity (AQI)"
+    icon: mdi:water-percent
+  - platform: template
+    id: aqi_co2
+    name: "Air Quality Index - CO2 (AQI)"
+    icon: mdi:air-filter
+    disabled_by_default: true
+
+#===== Read registers =====
+  - platform: modbus_controller
+    id: app_version
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Software version'
+    address: 1
+    register_type: read
+    register_count: 3
+    response_size: 6
+    raw_encode: ANSI
+    entity_category: diagnostic
+    disabled_by_default: true
+    skip_updates: 60
+    lambda: |-
+        float bus = bus_version->get_state();
+
+        if (bus >= 8) {
+          return x.substr(1,1) + x.substr(0,1) + x.substr(3,1) + x.substr(2,1) + x.substr(5,1) + x.substr(4,1);
+        } else {
+          return x.substr(0,1) + x.substr(1,1) + x.substr(2,1) + x.substr(3,1) + x.substr(4,1) + x.substr(5,1);
+        }
+
+  - platform: modbus_controller
+    id: alarm_list_1_id
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm 1 - Code'
+    address: 401
+    register_type: read
+    raw_encode: HEXBYTES
+    disabled_by_default: false
+    lambda: |-
+        std::string words[] = { "None", "(C) Hardware", "(C) - Timeout", "(C) - Fire",
+                                "(C+R) - Pressure", "(C+S) - Door", "(I) - Defrost", "(C) - Frost",
+                                "(C+S) - Frost", "(I+S) - Overtemp", "(I+S) - Overheat", "(I+S) - Airflow",
+                                "(C) - Thermo", "(C) - Boiling", "(C) - Sensor", "(C) - Room low",
+                                "(I) - Software", "(I) - Watchdog", "(I) - Config", "(I) - Filter",
+                                "(I) - Legionella", "(I) - Power", "(I) - T Air", "(I) - T Water",
+                                "(I) - T Heat", "(I) - Modem", "(I) - Instabus", "(C) - T1 short",
+                                "(C) - T1 open", "(C) - T2 short", "(C) - T2 open", "(C) - T3 short",
+                                "(C) - T3 open", "(C) - T4 short", "(C) - T4 open", "(C) - T5 short",
+                                "(C) - T5 open", "(C) - T6 short", "(C) - T6 open", "(C) - T7 short",
+                                "(C) - T7 open", "(C) - T8 short", "(C) - T8 open", "(C) - T9 short",
+                                "(C) - T9 open", "(C) - T10 short", "(C) - T10 open", "(C) - T11 short",
+                                "(C) - T11 open", "(C) - T12 short", "(C) - T12 open", "(C) - T13 short",
+                                "(C) - T13 open", "(C) - T14 short", "(C) - T14 open", "(C) - T15 short",
+                                "(C) - T15 open", "(C) - T16 short", "(C) - T16 open", "(I+S) - Anode", "(I) - Exchanger info",
+                                "(C+S) - Slave IO", "(I+S) - OPT IO", "(I) - Preset", "(I) - SW reject",
+                                "Unknown" };
+        uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+        if (value > 63) {
+          value = 64;
+        }
+        return words[value];
+
+  - platform: modbus_controller
+    id: alarm_list_1_date
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm 1 - Date'
+    address: 402
+    register_type: read
+    raw_encode: HEXBYTES
+    disabled_by_default: false
+    lambda: |-
+        uint16_t work = modbus_controller::word_from_hex_str(x, 0);
+        if (work!=0) {
+          uint16_t day = work & 0x1f;
+          work >>= 5;
+          uint16_t month = work & 0x0f;
+          uint16_t year = (work >> 4) + 1980;
+          std::string str = std::to_string(year) +"-" + ((month < 10) ? "0" : "") + std::to_string(month) +"-" + ((day < 10) ? "0" : "") +std::to_string(day);
+          return str;
+        } else {
+          std::string str = "N/A";
+          return str;
+        }
+
+  - platform: modbus_controller
+    id: alarm_list_1_time
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm 1 - Time'
+    address: 403
+    register_type: read
+    raw_encode: HEXBYTES
+    disabled_by_default: false
+    lambda: |-
+        uint16_t work = modbus_controller::word_from_hex_str(x, 0);
+        if (work!=0) {
+          uint16_t seconds = (work & 0x1f) >> 1;
+          work >>= 5;
+          uint16_t minutes = work & 0x3f;
+          uint16_t hours = (work >> 6);
+
+          std::string str = std::to_string(hours) +":" + std::to_string(minutes) +":" + std::to_string(seconds);
+          return str;
+        } else {
+          std::string str = "N/A";
+          return str;
+        }
+
+  - platform: modbus_controller
+    id: alarm_list_2_id
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm 2 - Code'
+    address: 404
+    register_type: read
+    disabled_by_default: true
+    raw_encode: HEXBYTES
+    lambda: |-
+        std::string words[] = { "None", "(C) Hardware", "(C) - Timeout", "(C) - Fire",
+                                "(C+R) - Pressure", "(C+S) - Door", "(I) - Defrost", "(C) - Frost",
+                                "(C+S) - Frost", "(I+S) - Overtemp", "(I+S) - Overheat", "(I+S) - Airflow",
+                                "(C) - Thermo", "(C) - Boiling", "(C) - Sensor", "(C) - Room low",
+                                "(I) - Software", "(I) - Watchdog", "(I) - Config", "(I) - Filter",
+                                "(I) - Legionella", "(I) - Power", "(I) - T Air", "(I) - T Water",
+                                "(I) - T Heat", "(I) - Modem", "(I) - Instabus", "(C) - T1 short",
+                                "(C) - T1 open", "(C) - T2 short", "(C) - T2 open", "(C) - T3 short",
+                                "(C) - T3 open", "(C) - T4 short", "(C) - T4 open", "(C) - T5 short",
+                                "(C) - T5 open", "(C) - T6 short", "(C) - T6 open", "(C) - T7 short",
+                                "(C) - T7 open", "(C) - T8 short", "(C) - T8 open", "(C) - T9 short",
+                                "(C) - T9 open", "(C) - T10 short", "(C) - T10 open", "(C) - T11 short",
+                                "(C) - T11 open", "(C) - T12 short", "(C) - T12 open", "(C) - T13 short",
+                                "(C) - T13 open", "(C) - T14 short", "(C) - T14 open", "(C) - T15 short",
+                                "(C) - T15 open", "(C) - T16 short", "(C) - T16 open", "(I+S) - Anode", "(I) - Exchanger info",
+                                "(C+S) - Slave IO", "(I+S) - OPT IO", "(I) - Preset", "(I) - SW reject",
+                                "Unknown" };
+        uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+        if (value > 63) {
+          value = 64;
+        }
+        return words[value];
+
+  - platform: modbus_controller
+    id: alarm_list_2_date
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm 2 - Date'
+    address: 405
+    register_type: read
+    disabled_by_default: true
+    raw_encode: HEXBYTES
+    lambda: |-
+        uint16_t work = modbus_controller::word_from_hex_str(x, 0);
+        if (work!=0) {
+          uint16_t day = work & 0x1f;
+          work >>= 5;
+          uint16_t month = work & 0x0f;
+          uint16_t year = (work >> 4) + 1980;
+          std::string str = std::to_string(year) +"-" + ((month < 10) ? "0" : "") + std::to_string(month) +"-" + ((day < 10) ? "0" : "") +std::to_string(day);
+          return str;
+        } else {
+          std::string str = "N/A";
+          return str;
+        }
+
+  - platform: modbus_controller
+    id: alarm_list_2_time
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm 2 - Time'
+    address: 406
+    register_type: read
+    disabled_by_default: true
+    raw_encode: HEXBYTES
+    lambda: |-
+        uint16_t work = modbus_controller::word_from_hex_str(x, 0);
+        if (work!=0) {
+          uint16_t seconds = (work & 0x1f) >> 1;
+          work >>= 5;
+          uint16_t minutes = work & 0x3f;
+          uint16_t hours = (work >> 6);
+
+          std::string str = std::to_string(hours) +":" + std::to_string(minutes) +":" + std::to_string(seconds);
+          return str;
+        } else {
+          std::string str = "N/A";
+          return str;
+        }
+
+  - platform: modbus_controller
+    id: alarm_list_3_id
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm 3 - Code'
+    address: 407
+    register_type: read
+    disabled_by_default: true
+    raw_encode: HEXBYTES
+    lambda: |-
+        std::string words[] = { "None", "(C) Hardware", "(C) - Timeout", "(C) - Fire",
+                                "(C+R) - Pressure", "(C+S) - Door", "(I) - Defrost", "(C) - Frost",
+                                "(C+S) - Frost", "(I+S) - Overtemp", "(I+S) - Overheat", "(I+S) - Airflow",
+                                "(C) - Thermo", "(C) - Boiling", "(C) - Sensor", "(C) - Room low",
+                                "(I) - Software", "(I) - Watchdog", "(I) - Config", "(I) - Filter",
+                                "(I) - Legionella", "(I) - Power", "(I) - T Air", "(I) - T Water",
+                                "(I) - T Heat", "(I) - Modem", "(I) - Instabus", "(C) - T1 short",
+                                "(C) - T1 open", "(C) - T2 short", "(C) - T2 open", "(C) - T3 short",
+                                "(C) - T3 open", "(C) - T4 short", "(C) - T4 open", "(C) - T5 short",
+                                "(C) - T5 open", "(C) - T6 short", "(C) - T6 open", "(C) - T7 short",
+                                "(C) - T7 open", "(C) - T8 short", "(C) - T8 open", "(C) - T9 short",
+                                "(C) - T9 open", "(C) - T10 short", "(C) - T10 open", "(C) - T11 short",
+                                "(C) - T11 open", "(C) - T12 short", "(C) - T12 open", "(C) - T13 short",
+                                "(C) - T13 open", "(C) - T14 short", "(C) - T14 open", "(C) - T15 short",
+                                "(C) - T15 open", "(C) - T16 short", "(C) - T16 open", "(I+S) - Anode", "(I) - Exchanger info",
+                                "(C+S) - Slave IO", "(I+S) - OPT IO", "(I) - Preset", "(I) - SW reject",
+                                "Unknown" };
+        uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+        if (value > 63) {
+          value = 64;
+        }
+        return words[value];
+
+  - platform: modbus_controller
+    id: alarm_list_3_date
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm 3 - Date'
+    address: 408
+    register_type: read
+    disabled_by_default: true
+    raw_encode: HEXBYTES
+    lambda: |-
+        uint16_t work = modbus_controller::word_from_hex_str(x, 0);
+        if (work!=0) {
+          uint16_t day = work & 0x1f;
+          work >>= 5;
+          uint16_t month = work & 0x0f;
+          uint16_t year = (work >> 4) + 1980;
+          std::string str = std::to_string(year) +"-" + ((month < 10) ? "0" : "") + std::to_string(month) +"-" + ((day < 10) ? "0" : "") +std::to_string(day);
+          return str;
+        } else {
+          std::string str = "N/A";
+          return str;
+        }
+
+  - platform: modbus_controller
+    id: alarm_list_3_time
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Alarm 3 - Time'
+    address: 409
+    register_type: read
+    disabled_by_default: true
+    raw_encode: HEXBYTES
+    lambda: |-
+        uint16_t work = modbus_controller::word_from_hex_str(x, 0);
+        if (work!=0) {
+          uint16_t seconds = (work & 0x1f) >> 1;
+          work >>= 5;
+          uint16_t minutes = work & 0x3f;
+          uint16_t hours = (work >> 6);
+
+          std::string str = ((hours < 10) ? "0" : "") + std::to_string(hours) +":" + ((minutes < 10) ? "0" : "") + std::to_string(minutes) +":" + ((seconds < 10) ? "0" : "") + std::to_string(seconds);
+          return str;
+        } else {
+          std::string str = "N/A";
+          return str;
+        }
+
+  - platform: modbus_controller
+    id: control_modeact
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Actual - operation mode'
+    address: 1001
+    register_type: read
+    raw_encode: HEXBYTES
+    disabled_by_default: false
+    lambda: |-
+        std::string words[] = { "Off", "Heat", "Cool", "Auto" , "Service",
+                                "Unknown"};
+        uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+        if (value > 4) {
+          value = 5;
+        }
+        return words[value];
+
+  - platform: modbus_controller
+    id: control_state
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Actual - control state'
+    address: 1002
+    register_type: read
+    raw_encode: HEXBYTES
+    disabled_by_default: false
+    lambda: |-
+        std::string words[] = { "Off", "Shift", "Stop", "Start",
+                                "Standby", "Ventilation stop", "Ventilation", "Heating" ,
+                                "Cooling", "Hot water", "Legionelle", "Cooling + hot water",
+                                "Central heating", "Defrost", "Frost secure", "Service",
+                                "Alarm",
+                                "Unknown" };
+        uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+        if (value > 16) {
+          value = 17;
+        }
+        return words[value];
+
+  - platform: modbus_controller
+    id: airflow_ventset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Actual - ventilation step'
+    address: 1100
+    register_type: read
+    raw_encode: HEXBYTES
+    disabled_by_default: false
+    lambda: |-
+        std::string words[] = { "Off", "1", "2", "3", "4",
+                                "Unknown" };
+        uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+        if (value > 4) {
+          value = 5;
+        }
+        return words[value];
+
+  - platform: modbus_controller
+    id: airflow_inletact
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Actual - ventilation step - inlet'
+    address: 1101
+    register_type: read
+    raw_encode: HEXBYTES
+    disabled_by_default: false
+    lambda: |-
+        std::string words[] = { "Off", "1", "2", "3", "4",
+                                "Unknown" };
+        uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+        if (value > 4) {
+          value = 5;
+        }
+        return words[value];
+
+  - platform: modbus_controller
+    id: airflow_exhaustact
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Actual - ventilation step - exhaust'
+    address: 1102
+    register_type: read
+    raw_encode: HEXBYTES
+    disabled_by_default: false
+    lambda: |-
+        std::string words[] = { "Off", "1", "2", "3", "4",
+                                "Unknown" };
+        uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+        if (value > 4) {
+          value = 5;
+        }
+        return words[value];
+
+  - platform: modbus_controller
+    id: display_text_line_1
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Display Text line 1'
+    address: 2002
+    register_type: read
+    register_count: 4
+    response_size: 8
+    raw_encode: HEXBYTES
+    disabled_by_default: false
+    lambda: |-
+        byte value;
+        std::string work = std::string();
+        int mylist[] = {1, 0, 3, 2, 5, 4, 7, 6 };
+
+        for (int num = 0; num < 8; num++) {
+          value = modbus_controller::byte_from_hex_str(x, mylist[num]);
+          switch (value) {
+            case 8: 
+              work += "Æ";
+              break;
+            case 9: 
+              work += "Ø";
+              break;
+            case 10: 
+              work += "Å";
+              break;
+            case 223:
+              work += "°";
+              break;
+            default:
+              work += char(value);
+          }
+        }
+        return work;
+
+  - platform: modbus_controller
+    id: display_text_line_2
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Display Text line 2'
+    address: 2007
+    register_type: read
+    register_count: 4
+    response_size: 8
+    raw_encode: HEXBYTES
+    disabled_by_default: false
+    lambda: |-
+        byte value;
+        std::string work = std::string();
+        int mylist[] = {1, 0, 3, 2, 5, 4, 7, 6 };
+
+        for (int num = 0; num < 8; num++) {
+          value = modbus_controller::byte_from_hex_str(x, mylist[num]);
+          switch (value) {
+            case 8: 
+              work += "Æ";
+              break;
+            case 9: 
+              work += "Ø";
+              break;
+            case 10: 
+              work += "Å";
+              break;
+            case 223:
+              work += "°";
+              break;
+            default:
+              work += char(value);
+          }
+        }
+        return work;
+
+#===== Holding registers =====
+  - platform: modbus_controller
+    id: time_date_time
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: ${friendly_name} time
+    address: 300
+    register_type: holding
+    register_count: 6
+    response_size: 12
+    raw_encode: HEXBYTES
+    entity_category: diagnostic
+    disabled_by_default: false
+    lambda: |-
+        size_t n_zero2 = 2;
+        size_t n_zero4 = 4;
+        std::string sec = std::to_string(modbus_controller::byte_from_hex_str(x, 1));
+        std::string min = std::to_string(modbus_controller::byte_from_hex_str(x, 3));
+        std::string hrs = std::to_string(modbus_controller::byte_from_hex_str(x, 5));
+        std::string day = std::to_string(modbus_controller::byte_from_hex_str(x, 7));
+        std::string mnt = std::to_string(modbus_controller::byte_from_hex_str(x, 9));
+        std::string year = std::to_string(modbus_controller::word_from_hex_str(x, 10));
+          
+        return std::string(n_zero4 - std::min(n_zero4, year.length()), '0') + year + "-" +
+                std::string(n_zero2 - std::min(n_zero2, mnt.length()), '0') + mnt + "-" +
+                std::string(n_zero2 - std::min(n_zero2, day.length()), '0') + day + " " +
+                std::string(n_zero2 - std::min(n_zero2, hrs.length()), '0') + hrs + ":" +
+                std::string(n_zero2 - std::min(n_zero2, min.length()), '0') + min + ":" +
+                std::string(n_zero2 - std::min(n_zero2, sec.length()), '0') + sec;
+
+  - platform: modbus_controller
+    id: program_userfuncact
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function active'
+    address: 600
+    register_type: holding
+    raw_encode: HEXBYTES
+    lambda: |-
+        std::string words[] = { "N/A", "Extend", "Inlet","Exhaust", "External heater offset", "Ventilate", "Cooker hood",
+                                "Unknown" };
+        uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+        if (value > 6) {
+          value = 7;
+        }
+        return words[value];
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: program_user2funcact
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function 2 active'
+    address: 610
+    register_type: holding
+    disabled_by_default: true
+    raw_encode: HEXBYTES
+    lambda: |-
+        std::string words[] = { "N/A", "Extend", "Inlet","Exhaust", "External heater offset", "Ventilate", "Cooker hood",
+                                "Unknown" };
+        uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+        if (value > 6) {
+          value = 7;
+        }
+        return words[value];
+
+  - platform: modbus_controller
+    id: control_type
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Machine type'
+    address: 1000
+    register_type: holding
+    raw_encode: HEXBYTES
+    skip_updates: 60
+    lambda: |-
+        std::string words[] = {  "None", "Test", "VPL 10 uden køl", "VPL 15 uden køl",
+                                 "VPL 15 med køl", "VPL 25 med 3 hastigheder uden køl", "VPL 25 med 3 hastigheder med køl", "VPL 28 2 hastigheder uden køl",
+                                 "VPL 28 med 2 hastigheder med køl", "VP 18 med kryds monteret oven på anlæg uden køl", "VP 18 med kryds monteret oven på anlæg med køl", "Vp 18 Compact og Compact p uden køl",
+                                 "VP 18 Compact og Compact P med køl", "Comfort anlæg (Comfort 300 LR)", "CT 150 anlæg med 1-2-3 omskifter", "VLX som kører VAV",
+                                 "VLX med 2 trin", "VLX med 3 trin", "VP 18 uden køl", "VP 18 med køl",
+                                 "VP 18 med elkedel uden køl", "VP 18 med elkedel og køl", "VGU 250 brugsvands varmepumpe", "VGU 250 brugsvands varmepumpe med elkedel",
+                                 "VPL 25 uden køl", "VPL 25 med køl", "VPM 120-560", "Comfort 1200 - 4000",
+                                 "VP 20 Compact gorona", "VLX med CTS 602 print", "Compact P Nordic", "Comfort Nordic",
+                                 "VP 18 Version 1", "Combi 300", "Compact med 4-vejsventil uden køl",
+                                "Unknown" };
+        uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+        if (value > 34) {
+          value = 35;
+        }
+        return words[value];
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: airflow_lasttestday
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Last air damper position test'
+    address: 1103
+    register_type: holding
+    disabled_by_default: true
+    raw_encode: HEXBYTES
+    lambda: |-
+        uint16_t work = modbus_controller::word_from_hex_str(x, 0);
+        if (work!=0) {
+          uint16_t day = work & 0x1f;
+          work >>= 5;
+          uint16_t month = work & 0x0f;
+          uint16_t year = (work >> 4) + 1980;
+          std::string str = std::to_string(year) +"-" + ((month < 10) ? "0" : "") + std::to_string(month) +"-" + ((day < 10) ? "0" : "") +std::to_string(day);
+          return str;
+        } else {
+          std::string str = "N/A";
+          return str;
+        }
+
+select:
+#===== Holding registers =====
+  - platform: modbus_controller
+    id: program_select
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Week program select'
+    address: 500
+    use_write_multiple: true
+    icon: mdi:calendar
+    disabled_by_default: true
+    optionsmap: {'N/A': 0,'Program 1': 1,'Program 2': 2,'Program 3': 3}
+
+  - platform: modbus_controller
+    id: program_userfuncset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function - select'
+    address: 601
+    use_write_multiple: true
+    optionsmap: {'N/A': 0,'Extend': 1,'Inlet': 2,'Exhaust': 3, 'External heater offset': 4, 'Ventilate': 5, 'Cooker Hood': 6}
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: program_usertimeset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function - min. period'
+    address: 602
+    use_write_multiple: true
+    optionsmap: { '00:00':0,   '00:15':15,  '00:30':30,  '00:45':45,  '01:00':100, '01:15':115, '01:30':130, '01:45':145,
+                  '02:00':200, '02:15':215, '02:30':230, '02:45':245, '03:00':300, '03:15':315, '03:30':330, '03:45':345,
+                  '04:00':400, '04:15':415, '04:30':430, '04:45':445, '05:00':500, '05:15':515, '05:30':530, '05:45':545,
+                  '06:00':600, '06:15':615, '06:30':639, '06:45':645, '07:00':700, '07:15':715, '07:30':730, '07:45':745,
+                  '08:00':800 }
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: program_userventset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function - ventilation step'
+    address: 603
+    use_write_multiple: true
+    optionsmap: {'Off': 0, '1': 1, '2': 2, '3': 3, '4': 4}
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: program_user2funcset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function 2 - select'
+    address: 611
+    use_write_multiple: true
+    disabled_by_default: true
+    optionsmap: {'N/A': 0,'Extend': 1,'Inlet': 2,'Exhaust': 3, 'External heater offset': 4, 'Ventilate': 5, 'Cooker Hood': 6}
+
+  - platform: modbus_controller
+    id: program_user2timeset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function 2 - min. period'
+    address: 612
+    use_write_multiple: true
+    disabled_by_default: true
+    optionsmap: { '00:00':0, '00:15':15, '00:30':30, '00:45':45, '01:00':100, '01:15':115, '01:30':130, '01:45':145, '02:00':200, '02:15':215, '02:30':230, '02:45':245, '03:00':300, '03:15':315, '03:30':330, '03:45':345, '04:00':400, '04:15':415, '04:30':430, '04:45':445, '05:00':500, '05:15':515, '05:30':530, '05:45':545, '06:00':600, '06:15':615, '06:30':639, '06:45':645, '07:00':700, '07:15':715, '07:30':730, '07:45':745, '08:00':800 }
+
+  - platform: modbus_controller
+    id: program_user2ventset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'User function 2 - ventilation step'
+    address: 613
+    use_write_multiple: true
+    disabled_by_default: true
+    optionsmap: {'Off': 0, '1': 1, '2': 2, '3': 3, '4': 4}
+
+  - platform: modbus_controller
+    id: control_modeset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Control - operation mode select'
+    address: 1002
+    use_write_multiple: true
+    optionsmap: { 'Off': 0, 'Heat': 1, 'Cool': 2, 'Auto': 3 }
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: control_ventset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Control - ventilation step select'
+    address: 1003
+    use_write_multiple: true
+    optionsmap: {'Off': 0, '1': 1, '2': 2, '3': 3, '4': 4}
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: control_servicemode
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Service mode select'
+    address: 1005
+    use_write_multiple: true
+    optionsmap: {'Off': 0, 'Defrost': 1, 'Flaps': 2, 'Inlet': 3, 'Exhaust': 4, 'Compressor': 5, 'Heating': 6, 'Hot water': 7, 'Central heat': 9}
+    internal: true
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: control_preset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Request preset to factory'
+    address: 1007
+    use_write_multiple: true
+    optionsmap: {'Ready': 0, 'Preset': 1, 'Backup (to user file)': 2, 'Restore (from user file)': 3}
+    internal: true
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: airflow_airexchmode
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Air exchange mode'
+    address: 1100
+    use_write_multiple: true
+    disabled_by_default: true
+    optionsmap: {'Energy': 0, 'Comfort': 1, 'Comfort water': 2}
+
+  - platform: modbus_controller
+    id: airflow_coolvent
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Cooling high ventilation step'
+    address: 1101
+    use_write_multiple: true
+    optionsmap: {'Off': 0, '2': 2, '3': 3, '4': 4}
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airflow_testselect
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Weekly air damper position self-test'
+    address: 1102
+    use_write_multiple: true
+    optionsmap: {'Off': 0, 'Wednesday 04:00': 1, 'Wednesday 12:00': 2}
+    internal: true
+    disabled_by_default: true
+
+  - platform: modbus_controller
+    id: airflow_teststate
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Actual - air damper position test state'
+    address: 1104
+    use_write_multiple: true
+    disabled_by_default: true
+    optionsmap: {'Off': 0, 'Standby': 1, 'Start': 2, 'Closing': 3, 'Opening': 4, 'OK': 5, 'Error': 6}
+
+  - platform: modbus_controller
+    id: airflow_filtalmtype
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Air filter monitoring alarm'
+    address: 1105
+    use_write_multiple: true
+    disabled_by_default: true
+    optionsmap: {'Pressure guard': 0, '30 days': 1, '90 days': 2, '180 days': 3, '360 days': 4, '70 days and pressure guard': 5}
+
+  - platform: modbus_controller
+    id: airtemp_coolset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Cooling temperature setpoint'
+    address: 1200
+    use_write_multiple: true
+    disabled_by_default: true
+    icon: mdi:thermometer
+    optionsmap: { 'Off':0,       'Set + 0°C':1,  'Set + 1°C':2,  'Set + 2°C':3,
+                  'Set + 3°C':4, 'Set + 4°C':5,  'Set + 5°C':6,  'Set + 7°C':7,
+                  'Set + 10°C':8 }
+
+  - platform: modbus_controller
+    id: airtemp_nightdaylim
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Temperature - Outdoor day temperature for night cooling activation'
+    address: 1206
+    use_write_multiple: true
+    disabled_by_default: true
+    icon: mdi:thermometer
+    optionsmap: { 'Off':0,    '20': 2000, '21': 2100, '22': 2200,
+                  '23': 2300, '24': 2400, '25': 2500, '26': 2600, 
+                  '27': 2700, '28': 2800, '29': 2900, '30': 3000, 
+                  '31': 3100, '32': 3200, '33': 3300, '34': 3400, 
+                  '35': 3500, '36': 3600, '37': 3700, '38': 3800, 
+                  '39': 3900, '40': 4000 }
+
+  - platform: modbus_controller
+    id: airqual_rh_ventlo
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'RH - humidity low winter step select'
+    address: 1910
+    use_write_multiple: true
+    optionsmap: {'Off': 0, '1': 1, '2': 2, '3': 3}
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airqual_rh_venthi
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'RH - humidity high step select'
+    address: 1911
+    use_write_multiple: true
+    optionsmap: {'Off': 0, '2': 2, '3': 3, '4': 4}
+    disabled_by_default: false
+
+  - platform: modbus_controller
+    id: airqual_co2_venthi
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'CO2 - high step select'
+    address: 1920
+    use_write_multiple: true
+    disabled_by_default: true
+    optionsmap: {'Off': 0, '2': 2, '3': 3, '4': 4}
+
+
+switch:
+#===== System =====
+  - platform: factory_reset
+    name: ${friendly_name} controller factory reset
+    disabled_by_default: true
+  - platform: restart
+    name: ${friendly_name} controller restart
+  - platform: shutdown
+    name: ${friendly_name} controller shutdown
+    disabled_by_default: true
+
+#===== Holding registers =====
+  - platform: modbus_controller
+    id: control_runset
+    modbus_controller_id: ${modbus_ctrl_id}
+    name: 'Control - on / off select'
+    address: 1001
+    register_type: holding
+    use_write_multiple: true
+    bitmask: 1
+    disabled_by_default: false
+
+
+light:
+#===== System =====
+  - platform: status_led
+    name: ${friendly_name} controller status LED
+    id: device_board_gpio26
+    pin: GPIO26
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: diagnostic
