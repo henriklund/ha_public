@@ -172,17 +172,46 @@ The usageWindow must be a whole number between 1 and 60 minutes. This duration i
                             hint="Energi Data Service") | from_json -}}
  
 ### Dishwasher must be run at cheapest hour, but be completed by 06:00 tomorrow
+template:
+  - trigger:
+      - trigger: state
+        entity_id: sensor.stromligning_current_price_vat
+      - trigger: state
+        entity_id: sensor.dishwasher_start_time
+      - trigger: state
+        entity_id: sensor.dishwasher_remaining_time
+      - trigger: time_pattern
+        minutes: /1
+        id: "every_minute"
+      - trigger: homeassistant
+        event: start
+        id: "restart"
+    action:
+      - variables:
+          okToStart: >-
+            {{ states('sensor.dishwasher') in ('programmed','waiting_to_start') }}
+          result: >-
             {% from 'electricity.jinja' import PeriodPrice %}
-            {%- set edsSensor         = "sensor.energidataservice" -%}
-            {%- set earliestDatetime  = now() -%}
-            {#- Add 20min for the normal cycle of dishwasher cooling off and opening door -#}
-            {%- set duration=  20 + states('sensor.dishwasher_remaining_time') | int(90) -%}
-            {#- Dishwasher is precoded to start 04:30 at the latest, thus providing 'failsafe' -#}
-            {%- set latestDatetime    = earliestDatetime + timedelta(minutes=states('sensor.dishwasher_start_time') | int(8*60) + duration) -%}
-            {#- Get data from EnergiDataService, ignore forecasted values -#}
-            {{- PeriodPrice(edsSensor, sensor_forecast="", 
-                            earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, duration=duration, 
-                            hint="Energi Data Service") | from_json -}}
+            {%- if okToStart -%}
+              {%- set edsSensor         = "sensor.stromligning_current_price_vat" -%}
+              {%- set earliestDatetime  = now() -%}
+              {#- Add 20min for the normal cycle of dishwasher cooling off and opening door -#}
+              {%- set duration=  20 + states('sensor.dishwasher_remaining_time') | int(90) -%}
+              {#- Dishwasher is precoded to start 04:30 at the latest, thus providing 'failsafe' -#}
+              {%- set latestDatetime    = earliestDatetime + timedelta(minutes=states('sensor.dishwasher_start_time') | int(8*60) + duration) -%}
+              {#- Get data from Strømligning, ignore forecasted values -#}
+              {{- PeriodPrice(edsSensor, sensor_forecast="", 
+                              earliestDatetime=earliestDatetime, latestDatetime=latestDatetime, duration=duration, 
+                              hint="Strømligning") | from_json -}}
+            {% else %}
+              N/A
+            {% endif %}
+          runNow: >-
+            {% if okToStart %}
+              {{ none if "cheap" not in result or "startTime" not in result.cheap else now() | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') == (result).cheap.startTime | as_timestamp | timestamp_custom('%Y-%m-%d %H:%M') }}
+            {% else %}
+              N/A
+            {% endif %}
               
 ### Dishwasher must be run at cheapest hour, but be completed by 06:00 tomorrow. Cascade two integrations for data
             {% from 'electricity.jinja' import PeriodPrice %}
