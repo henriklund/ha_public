@@ -1,0 +1,19 @@
+#===========================================================================================================
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  manual_ip:
+    static_ip: 10.10.26.${ip}
+    gateway: 10.10.26.1
+    subnet: 255.255.255.0
+  reboot_timeout: 3min
+  min_auth_mode: wpa2
+
+#  ap:
+#    ssid: "${shortname} - Fallback Hotspot"
+#    password: !secret captive_password
+#    ap_timeout: 0s
+
+#captive_portal:
+#===========================================================================================================
+

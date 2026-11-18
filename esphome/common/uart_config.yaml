@@ -1,0 +1,151 @@
+substitutions:
+  uart_baud_rate: "38400"
+  uart_parity: "EVEN"
+  uart_data_bits: "8"
+  uart_stop_bits: "1"
+  uart_id: "uart"
+  uart_tx_pin: GPIO17
+  uart_rx_pin: GPIO16
+
+uart:  
+  id: ${uart_id}
+  baud_rate: ${uart_baud_rate}
+  parity: ${uart_parity}
+  data_bits: ${uart_data_bits}
+  stop_bits: ${uart_stop_bits}
+  tx_pin: ${uart_tx_pin}
+  rx_pin: ${uart_rx_pin}
+
+select:
+  - id: change_baud_rate
+    name: UART - baud rate
+    platform: template
+    options:
+      - "2400"
+      - "9600"
+      - "19200"
+      - "38400"
+      - "57600"
+      - "115200"
+      - "256000"
+      - "512000"
+      - "921600"
+    initial_option: ${uart_baud_rate}
+    optimistic: true
+    restore_value: True
+    internal: false
+    entity_category: config
+    set_action:
+      - lambda: |-
+          id(mbus).flush();
+          uint32_t new_baud_rate = stoi(x);
+          ESP_LOGD("change_baud_rate", "Changing baud rate from %lu to %lu",id(mbus).get_baud_rate(),
+                   new_baud_rate);
+          if (id(mbus).get_baud_rate() != new_baud_rate) {
+            id(mbus).set_baud_rate(new_baud_rate);
+            id(mbus).load_settings();
+          }
+    icon: mdi:swap-horizontal
+    disabled_by_default: true
+    
+  - id: change_uart_parity
+    name: UART - parity
+    platform: template
+    options:
+      - "NONE"
+      - "EVEN"
+      - "ODD"
+    initial_option: ${uart_parity}
+    optimistic: true
+    restore_value: true
+    internal: false
+    entity_category: config
+    set_action:
+      - lambda: |-
+          id(mbus).flush();
+
+          auto new_parity = uart::UART_CONFIG_PARITY_NONE;
+
+          if (x == "EVEN") {
+            new_parity = uart::UART_CONFIG_PARITY_EVEN;
+          } else if (x == "ODD") {
+            new_parity = uart::UART_CONFIG_PARITY_ODD;
+          }
+
+          ESP_LOGD(
+            "change_uart_parity",
+            "Changing parity from %d to %d",
+            id(mbus).get_parity(),
+            new_parity
+          );
+
+          if (id(mbus).get_parity() != new_parity) {
+            id(mbus).set_parity(new_parity);
+            id(mbus).load_settings();
+          }
+    icon: mdi:swap-horizontal
+    disabled_by_default: true
+    
+
+  - id: change_uart_data_bits
+    name: UART - data bits
+    platform: template
+    options:
+      - "5"
+      - "6"
+      - "7"
+      - "8"
+    initial_option: ${uart_data_bits}
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    set_action:
+      - lambda: |-
+          id(mbus).flush();
+
+          uint8_t new_data_bits = stoi(x);
+
+          ESP_LOGD(
+            "change_uart_data_bits",
+            "Changing data bits from %u to %u",
+            id(mbus).get_data_bits(),
+            new_data_bits
+          );
+
+          if (id(mbus).get_data_bits() != new_data_bits) {
+            id(mbus).set_data_bits(new_data_bits);
+            id(mbus).load_settings();
+          }
+    icon: mdi:swap-horizontal
+    disabled_by_default: true
+
+    
+  - id: change_uart_stop_bits
+    name: UART - stop bits
+    platform: template
+    options:
+      - "1"
+      - "2"
+    initial_option: ${uart_stop_bits}
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    set_action:
+      - lambda: |-
+          id(mbus).flush();
+
+          uint8_t new_stop_bits = stoi(x);
+
+          ESP_LOGD(
+            "change_uart_stop_bits",
+            "Changing stop bits from %u to %u",
+            id(mbus).get_stop_bits(),
+            new_stop_bits
+          );
+
+          if (id(mbus).get_stop_bits() != new_stop_bits) {
+            id(mbus).set_stop_bits(new_stop_bits);
+            id(mbus).load_settings();
+          }
+    icon: mdi:swap-horizontal
+    disabled_by_default: true

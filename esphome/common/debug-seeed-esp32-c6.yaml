@@ -1,0 +1,16 @@
+logger:
+  level: DEBUG
+  baud_rate: 115200
+  hardware_uart: USB_SERIAL_JTAG
+
+debug:
+  update_interval: 5s
+
+sensor:
+  - platform: debug
+    free:
+      name: ${friendly_name} controller - heap free
+    block:
+      name: ${friendly_name} controller - heap max block
+    loop_time:
+      name: ${friendly_name} controller - loop time

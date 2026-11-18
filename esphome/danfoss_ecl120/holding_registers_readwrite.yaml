@@ -1,0 +1,875 @@
+select:
+# -----------------------------------------------------------------------------
+# Inputs (4000 -> 5999)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    # Note that both 4398=1 & 4399=2 needs to be configured for SCADA Outdoor Temperature write
+    id: outdoor_temperature_source
+    name: "Inputs - Outdoor Temperature Source"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4397
+    #1-based address: 4398
+    optimistic: true
+    optionsmap: {'Physical sensor': 0,'Modbus': 1,'Reserved': 2}
+    disabled_by_default: true
+  - platform: modbus_controller
+    # Note that both 4398=1 & 4399=2 needs to be configured for SCADA Outdoor Temperature write
+    id: outdoor_temperature_share_config
+    name: "Inputs - Outdoor Temperature Share Config"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4398
+    #1-based address: 4399
+    optimistic: true
+    optionsmap: {'Sharing Off': 0,'Share on Modbus': 1,'Receive on Modbus': 2}
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: modbus_temperature_sensor_status
+    name: "Inputs - Modbus Temperature Sensor Status"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4400
+    #1-based address: 4401
+    optimistic: true
+    optionsmap: {'OK': 0,'NOK': 1}
+    disabled_by_default: true
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat Status (21000 -> 21099)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: circuit1_operation_mode
+    name: "Circuit 1 - Heat Status - Operation Mode"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 20999
+    #1-based address: 21000
+    optimistic: true
+    optionsmap: {'Automatic': 0,'Comfort': 1,'Saving': 2,'Frost protection': 3}
+
+
+number:
+# -----------------------------------------------------------------------------
+# System Settings (2000 -> 3999 )
+# -----------------------------------------------------------------------------
+# Offset (in mins.) to adjust time, eg. timezones
+# Note that it is (despite being signed dword), not possible to use negative
+# numbers. Those will be set to zero by the ECL120
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: time_timezone_offset
+    name: "${model} - Time TimeZone Offset"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 2050
+    #1-based address: 2051
+    value_type: S_DWORD
+    min_value: 0
+    max_value: 1440   # Max. allowed is 65535
+    step: 1
+    unit_of_measurement: "min."
+    icon: mdi:clock-plus-outline
+    register_type: holding
+    disabled_by_default: true
+
+
+# -----------------------------------------------------------------------------
+# Inputs (4000 -> 5999)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: measurement_source_modbus
+    name: "Inputs - Measurement Source Modbus"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4399
+    #1-based address: 4400
+    value_type: S_WORD
+    min_value: -6400
+    max_value: 19200
+    step: 1
+    multiply: 0.01
+    unit_of_measurement: "°C"
+    register_type: holding
+    disabled_by_default: true
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat References (21200 -> 21299)
+# -----------------------------------------------------------------------------
+# Circuit 1 – Supply temperature (flow temperature / heating curve)
+# DK: Fremløbstemperatur for kreds 1
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    # DK: Min. fremløbstemperatur for kreds 1
+    id: circuit1_heat_flow_temperature_minimum_reference
+    name: "Circuit 1 - Heat References - Heat Flow Temperature Minimum Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21201
+    #1-based address: 21202
+    value_type: FP32
+    min_value: 5
+    max_value: 150
+    step: 1.0
+    unit_of_measurement: °C
+    device_class: temperature
+    icon: "mdi:thermometer-water"
+    register_type: holding
+  - platform: modbus_controller
+    # DK: Max. fremløbstemperatur for kreds 1
+    id: circuit1_heat_flow_temperature_maximum_reference
+    name: "Circuit 1 - Heat References - Heat Flow Temperature Maximum Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21203
+    #1-based address: 21204
+    value_type: FP32
+    min_value: 5
+    max_value: 150
+    step: 1.0
+    unit_of_measurement: °C
+    device_class: temperature
+    icon: "mdi:thermometer-water"
+    register_type: holding
+  - platform: modbus_controller
+    id: circuit1_heat_summer_cut_out_temperature_reference
+    name: "Circuit 1 - Heat References - Heat Summer Cut Out Temperature Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21207
+    #1-based address: 21208
+    value_type: FP32
+    min_value: 0
+    max_value: 50
+    step: 1.0     # 0.1
+    unit_of_measurement: °C
+    device_class: temperature
+    icon: "mdi:thermometer-water"
+    register_type: holding
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_heat_return_temperature_reference
+    name: "Circuit 1 - Heat References - Heat Return Temperature Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21209
+    #1-based address: 21210
+    value_type: FP32
+    min_value: 5
+    max_value: 150
+    step: 1.0     # 0.1
+    unit_of_measurement: °C
+    device_class: temperature
+    icon: "mdi:thermometer-water"
+    register_type: holding
+
+
+# -----------------------------------------------------------------------------
+# Comfort / Saving / Boost (room limiter + boost)
+# -----------------------------------------------------------------------------
+    # DK: Komforttemperatur references
+  - platform: modbus_controller
+    id: circuit1_heat_room_comfort_relative_reference
+    name: "Circuit 1 - Heat References - Heat Room Comfort Relative Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21211
+    #1-based address: 21212
+    value_type: FP32
+    min_value: 0.5
+    max_value: 5.0
+    step: 0.5
+    unit_of_measurement: °C
+    device_class: temperature
+    icon: "mdi:home-thermometer"
+    register_type: holding
+  - platform: modbus_controller
+    # DK: Sparetemperatur references
+    id: circuit1_heat_room_saving_relative_reference
+    name: "Circuit 1 - Heat References - Heat Room Saving Relative Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21213
+    #1-based address: 21214
+    value_type: FP32
+    min_value: 0.5
+    max_value: 5.0
+    step: 0.5
+    unit_of_measurement: °C
+    device_class: temperature
+    icon: "mdi:home-thermometer-outline"
+    register_type: holding
+  - platform: modbus_controller
+    id: circuit1_heat_room_comfort_reference
+    name: "Circuit 1 - Heat References - Heat Room Comfort Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21215
+    #1-based address: 21216
+    value_type: FP32
+    min_value: 4
+    max_value: 40
+    step: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    icon: "mdi:home-thermometer-outline"
+    register_type: holding
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_heat_room_saving_reference
+    name: "Circuit 1 - Heat References - Heat Room Saving Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21217
+    #1-based address: 21218
+    value_type: FP32
+    min_value: 5
+    max_value: 40
+    step: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    icon: "mdi:home-thermometer-outline"
+    register_type: holding
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_frost_protection_heat_flow_reference
+    name: "Circuit 1 - Heat References - Frost Protection Heat Flow Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21219
+    #1-based address: 21220
+    value_type: FP32
+    min_value: 5
+    max_value: 40
+    step: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    icon: "mdi:home-thermometer-outline"
+    register_type: holding
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_bypass_temperature_reference
+    name: "Circuit 1 - Heat References - Bypass Temperature Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21225
+    #1-based address: 21226
+    value_type: FP32
+    min_value: 5
+    max_value: 150
+    step: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    icon: "mdi:home-thermometer-outline"
+    register_type: holding
+    disabled_by_default: true
+  - platform: modbus_controller
+    # DK: Fremløbstemperatur ved -30°C for kreds 1
+    id: circuit1_supply_temp_at_minus30
+    name: "Circuit 1 - Heat References - supply temperature at -30 °C"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21231
+    #1-based address: 21232
+    value_type: FP32
+    min_value: 5
+    max_value: 250
+    step: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    register_type: holding
+  - platform: modbus_controller
+    # DK: Fremløbstemperatur ved -15°C for kreds 1
+    id: circuit1_supply_temp_at_minus15
+    name: "Circuit 1 - Heat References - supply temperature at -15 °C"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21233
+    #1-based address: 21234
+    value_type: FP32
+    min_value: 5
+    max_value: 250
+    step: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    register_type: holding
+  - platform: modbus_controller
+    # DK: Fremløbstemperatur ved -5°C for kreds 1
+    id: circuit1_supply_temp_at_minus5
+    name: "Circuit 1 - Heat References - supply temperature at -5 °C"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21235
+    #1-based address: 21236
+    value_type: FP32
+    min_value: 5
+    max_value: 250
+    step: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    register_type: holding
+  - platform: modbus_controller
+    # DK: Fremløbstemperatur ved 0°C for kreds 1
+    id: circuit1_supply_temp_at_0
+    name: "Circuit 1 - Heat References - supply temperature at 0 °C"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21237
+    #1-based address: 21238
+    value_type: FP32
+    min_value: 5
+    max_value: 250
+    step: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    register_type: holding
+  - platform: modbus_controller
+    # DK: Fremløbstemperatur ved 5°C for kreds 1
+    id: circuit1_supply_temp_at_5
+    name: "Circuit 1 - Heat References - supply temperature at 5 °C"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21239
+    #1-based address: 21240
+    value_type: FP32
+    min_value: 5
+    max_value: 250
+    step: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    register_type: holding
+  - platform: modbus_controller
+    # DK: Fremløbstemperatur ved 15°C for kreds 1
+    id: circuit1_supply_temp_at_15
+    name: "Circuit 1 - Heat References - supply temperature at 15 °C"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21241
+    #1-based address: 21242
+    value_type: FP32
+    min_value: 5
+    max_value: 250
+    step: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    register_type: holding
+  - platform: modbus_controller
+    id: circuit1_constant_base_reference
+    name: "Circuit 1 - Heat References - Constant Base Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21243
+    #1-based address: 21244
+    value_type: FP32
+    min_value: -200
+    max_value: 200
+    step: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    register_type: holding
+  - platform: modbus_controller
+    id: circuit1_constant_base_slope
+    name: "Circuit 1 - Heat References - Constant Base Slope"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21245
+    #1-based address: 21246
+    value_type: FP32
+    min_value: 0
+    max_value: 5
+    step: 1
+    register_type: holding
+  - platform: modbus_controller
+    id: circuit1_supply_offset_reference
+    name: "Circuit 1 - Heat References - Supply Offset Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21247
+    #1-based address: 21248
+    value_type: FP32
+    min_value: -45
+    max_value: 0
+    step: 1
+    unit_of_measurement: K
+    device_class: temperature
+    register_type: holding
+  - platform: modbus_controller
+    id: circuit1_pump_heat_temp
+    name: "Circuit 1 - Heat References - Pump Heat Temp"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21249
+    #1-based address: 21250
+    value_type: FP32
+    min_value: 5
+    max_value: 40
+    step: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    register_type: holding
+  - platform: modbus_controller
+    id: circuit1_frost_protection_outside_temp_reference
+    name: "Circuit 1 - Heat References - Frost Protection Outside Temp Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21251
+    #1-based address: 21252
+    value_type: FP32
+    min_value: -10
+    max_value: 20
+    step: 1
+    unit_of_measurement: °C
+    device_class: temperature
+    register_type: holding
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat Settings (21400 -> 21499)
+# -----------------------------------------------------------------------------
+# Comfort / Saving / Boost (room limiter + boost)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: circuit1_heat_pump_after_run_time
+    name: "Circuit 1 - Heat Settings - Heat Pump After Run Time"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21399
+    #1-based address: 21400
+    value_type: U_DWORD
+    unit_of_measurement: s
+    register_type: holding
+    min_value: 0
+    max_value: 18000
+    step: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_return_limiter_min_influence
+    name: "Circuit 1 - Heat Settings - Return Limiter Min Influence"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21401
+    #1-based address: 21402
+    value_type: FP32
+    min_value: 0
+    max_value: 10
+    step: 1
+    register_type: holding
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_return_limiter_max_influence
+    name: "Circuit 1 - Heat Settings - Return Limiter Max Influence"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21403
+    #1-based address: 21404
+    value_type: FP32
+    min_value: -10
+    max_value: 0
+    step: 1
+    register_type: holding
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_return_limiter_adaption_time
+    name: "Circuit 1 - Heat Settings - Return Limiter Adaption Time"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21405
+    #1-based address: 21406
+    value_type: FP32
+    min_value: 0
+    max_value: 50
+    step: 1
+    register_type: holding
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_room_limiter_min_influence
+    name: "Circuit 1 - Heat Settings - Room Limiter Min Influence"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21407
+    #1-based address: 21408
+    value_type: FP32
+    min_value: 0
+    max_value: 10
+    step: 1
+    register_type: holding
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_room_limiter_max_influence
+    name: "Circuit 1 - Heat Settings - Room Limiter Max Influence"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21409
+    #1-based address: 21410
+    value_type: FP32
+    min_value: -10
+    max_value: 0
+    step: 1
+    register_type: holding
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_room_limiter_adaption_time
+    name: "Circuit 1 - Heat Settings - Room Limiter Adaption Time"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21411
+    #1-based address: 21412
+    value_type: FP32
+    min_value: 0
+    max_value: 50
+    step: 1
+    register_type: holding
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_heat_pump_excercise_on
+    name: "Circuit 1 - Heat Settings - Heat Pump Exercise Time On"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21425
+    #1-based address: 21426
+    value_type: U_DWORD
+    unit_of_measurement: s
+    register_type: holding
+    min_value: 0
+    max_value: 18000
+    step: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_heat_pump_excercise_idle_time
+    name: "Circuit 1 - Heat Settings - Heat Pump Exercise Idle Time"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21427
+    #1-based address: 21428
+    value_type: U_DWORD
+    unit_of_measurement: s
+    register_type: holding
+    min_value: 0
+    max_value: 864000
+    step: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_heat_pump_excercise_trigger_time
+    name: "Circuit 1 - Heat Settings - Heat Pump Exercise Trigger Time"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21429
+    #1-based address: 21430
+    value_type: U_DWORD
+    unit_of_measurement: s
+    register_type: holding
+    min_value: 0
+    max_value: 864000
+    step: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_heat_valve_excercise_opening
+    name: "Circuit 1 - Heat Settings - Heat Valve Exercise Opening"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21431
+    #1-based address: 21432
+    value_type: FP32
+    unit_of_measurement: "%"
+    register_type: holding
+    min_value: 0
+    max_value: 1
+    step: 0.01
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_heat_valve_excercise_open_time
+    name: "Circuit 1 - Heat Settings - Heat Valve Exercise Open Time"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21433
+    #1-based address: 21434
+    value_type: U_DWORD
+    unit_of_measurement: s
+    register_type: holding
+    min_value: 0
+    max_value: 86400
+    step: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_heat_valve_excercise_close_time
+    name: "Circuit 1 - Heat Settings - Heat Valve Exercise Close Time"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21435
+    #1-based address: 21436
+    value_type: U_DWORD
+    unit_of_measurement: s
+    register_type: holding
+    min_value: 0
+    max_value: 864000
+    step: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_boost_period
+    name: "Circuit 1 - Heat Settings - Boost period"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21437
+    #1-based address: 21438
+    value_type: U_DWORD
+    unit_of_measurement: "s"
+    register_type: holding
+    min_value: 0
+    max_value: 86400
+    step: 60
+    icon: "mdi:timer-cog-outline"
+  - platform: modbus_controller
+    id: circuit1_boost_added_temperature
+    name: "Circuit 1 - Heat Settings - Boost added temperature"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21439
+    #1-based address: 21440
+    value_type: FP32
+    unit_of_measurement: K
+    register_type: holding
+    min_value: 0.0
+    max_value: 25.0
+    step: 1.0
+    icon: "mdi:thermometer-plus"
+  - platform: modbus_controller
+    id: circuit1_reference_ramp_period
+    name: "Circuit 1 - Heat Settings - Reference Ramp Period"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21441
+    #1-based address: 21442
+    value_type: U_DWORD
+    unit_of_measurement: s
+    register_type: holding
+    min_value: 0
+    max_value: 5940
+    step: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_auto_reduced_saving_temperature_limit
+    name: "Circuit 1 - Heat Settings - Auto Reduced Saving Temperature Limit"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21443
+    #1-based address: 21444
+    value_type: FP32
+    unit_of_measurement: °C
+    register_type: holding
+    disabled_by_default: true
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 – PID tuning / regulation parameters
+# DK: Reguleringsparametre for kreds 1
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: circuit1_pid_xp_low
+    name: "Circuit 1 - Heat Settings - PID Xp Low"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21445
+    #1-based address: 21446
+    value_type: U_WORD
+    min_value: 0
+    max_value: 250
+    step: 1
+    unit_of_measurement: K
+    register_type: holding
+    icon: "mdi:tune"
+  - platform: modbus_controller
+    id: circuit1_pid_xp_high
+    name: "Circuit 1 - Heat Settings - PID Xp High"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21446
+    #1-based address: 21447
+    value_type: U_WORD
+    min_value: 0
+    max_value: 250
+    step: 1
+    unit_of_measurement: K
+    register_type: holding
+    icon: "mdi:tune"
+  - platform: modbus_controller
+    #  Adaptation time for PID
+    id: circuit1_pid_tn
+    name: "Circuit 1 - Heat Settings - PID Tn"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21447
+    #1-based address: 21448
+    value_type: U_WORD
+    min_value: 0
+    max_value: 999
+    step: 1
+    unit_of_measurement: "s"
+    device_class: "duration"
+    register_type: holding
+    icon: "mdi:timer-outline"
+  - platform: modbus_controller
+    # Weather Compensation Slope Parameter that its initial value is set at reset based on curve
+    id: circuit1_weather_compensation_slope
+    name: "Circuit 1 - Heat References - weather compensation slope"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21455
+    #1-based address: 21456
+    value_type: FP32
+    min_value: 0.0
+    max_value: 4.0
+    step: 0.1
+    register_type: holding
+    icon: "mdi:chart-line"
+  - platform: modbus_controller
+    # Sets the +/- deadband/neutral zone for the heat flow PID
+    id: circuit1_pid_deadband
+    name: "Circuit 1 - Heat Settings - Heat flow PID Deadband"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21457
+    #1-based address: 21458
+    value_type: FP32
+    min_value: 0.0
+    max_value: 10.0
+    step: 0.5
+    #filters:
+    #  - multiply: 0.5                     # scale=2.0 due to 0.5 K resolution in ECL (Modbus value * 2 = UI value)
+    unit_of_measurement: K
+    register_type: holding
+    icon: "mdi:arrow-expand-horizontal"
+
+
+switch:
+# -----------------------------------------------------------------------------
+# System Settings (2000 -> 3999 )
+# -----------------------------------------------------------------------------
+# Offset (in mins.) to adjust time, eg. timezones
+# Note that it is (despite being signed dword), not possible to use negative
+# numbers. Those will be set to zero by the ECL120
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: time_daylight_saving_active
+    name: "${model} - Time Daylight Saving Active"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 2049
+    #1-based address: 2050
+    register_type: holding
+    bitmask: 1
+    disabled_by_default: true
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat Status (21000 -> 21099)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: circuit1_boost_active
+    name: "Circuit 1 - Heat Status - Boost active"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21002
+    #1-based address: 21003
+    register_type: holding
+    bitmask: 1
+    icon: "mdi:rocket-launch"
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat Enable (21600 -> 21699 )
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: circuit1_room_limiter_enable
+    name: "Circuit 1 - Heat Enable - Room Limiter Enable"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21599
+    #1-based address: 21600
+    register_type: holding
+    bitmask: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_return_limiter_enable
+    name: "Circuit 1 - Heat Enable - Return Limiter Enable"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21600
+    #1-based address: 21601
+    register_type: holding
+    bitmask: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_total_stop_enable
+    name: "Circuit 1 - Heat Enable - Total Stop Enable"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21601
+    #1-based address: 21602
+    register_type: holding
+    bitmask: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_summer_cut_out_enable
+    name: "Circuit 1 - Heat Enable - Summer Cut Out Enable"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21602
+    #1-based address: 21603
+    register_type: holding
+    bitmask: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_summer_reference_ramp_enable
+    name: "Circuit 1 - Heat Enable - Reference Ramp Enable"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21603
+    #1-based address: 21604
+    register_type: holding
+    bitmask: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_auto_reduced_saving_enable
+    name: "Circuit 1 - Heat Enable - Auto Reduced Saving Enable"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21604
+    #1-based address: 21605
+    register_type: holding
+    bitmask: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_frost_protection_enable
+    name: "Circuit 1 - Heat Enable - Frost Protection Enable"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21605
+    #1-based address: 21606
+    register_type: holding
+    bitmask: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_pump_excercise_enable
+    name: "Circuit 1 - Heat Enable - Pump Exercise Enable"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21607
+    #1-based address: 21608
+    register_type: holding
+    bitmask: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_valve_excercise_enable
+    name: "Circuit 1 - Heat Enable - Valve Exercise Enable"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21608
+    #1-based address: 21609
+    register_type: holding
+    bitmask: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_external_override_enable
+    name: "Circuit 1 - Heat Enable - External Override Enable"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21609
+    #1-based address: 21610
+    register_type: holding
+    bitmask: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_bypass_enable
+    name: "Circuit 1 - Heat Enable - Bypass Enable"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21611
+    #1-based address: 21612
+    register_type: holding
+    bitmask: 1
+    disabled_by_default: true
+
+
+button:
+# -----------------------------------------------------------------------------
+# System Info (1 -> 1999)
+# -----------------------------------------------------------------------------
+# Button will trigger an update of the UTC value as reported by the SNTP
+# -----------------------------------------------------------------------------
+  - platform: output
+    name: "${model} - Synchronize Time UTC"
+    id: sync_time
+    output: write_epoch
+    duration: 50ms
+    disabled_by_default: true
+
+
+output:
+# -----------------------------------------------------------------------------
+# System Info (1 -> 1999)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: write_epoch
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 621
+    #1-based address: 622
+    value_type: U_DWORD
+    register_type: holding
+    use_write_multiple: true
+    write_lambda: |-
+      if (x < 0.5f)
+        return {};
+
+      // Get current UTC Unix epoch
+      uint32_t epoch = id(${shortname}sntp_time).now().timestamp;
+
+      // Split into two 16-bit registers (MSW first)
+      const uint16_t registers[2] = {
+        (uint16_t)(epoch >> 16),
+        (uint16_t)(epoch & 0xFFFF)
+      };
+
+      // Write both registers using the new API
+      item->write_multiple_registers(1111, registers);
+
+      return {};

@@ -1,0 +1,61 @@
+#===========================================================================================================
+esp32_ble_tracker:
+  id: ble_tracker
+  scan_parameters:
+    active: false
+    #active: true
+    interval: 320ms
+    #window: 90ms
+    window: 290ms # default 30ms. Time spent listening during interval.#===========================================================================================================
+    continuous: true
+#===========================================================================================================
+
+
+
+#===========================================================================================================
+esp32_ble_beacon:
+  type: iBeacon
+  uuid: f4e6570d-842e-4ec3-9ccc-eb1a5012751c
+  major: 1
+  minor: ${ip}
+  min_interval: 500ms
+  max_interval: 1000ms
+
+
+
+#===========================================================================================================
+bluetooth_proxy:
+  active: true
+#===========================================================================================================
+
+
+
+#===========================================================================================================
+select:
+  - platform: template
+    name: "BLE Scan Profile"
+    id: sel_ble_scan_profile
+    optimistic: true
+    restore_value: true
+    initial_option: "Medium"
+    options:
+      - "Low"
+      - "Medium"
+      - "High"
+    set_action:
+      - lambda: |-
+          id(ble_tracker).stop_scan();
+          auto opt = id(sel_ble_scan_profile).current_option();
+          if (opt == "Low") {
+            id(ble_tracker).set_scan_interval(320);
+            id(ble_tracker).set_scan_window(30);
+          } else if (opt == "Medium") {
+            id(ble_tracker).set_scan_interval(320);
+            id(ble_tracker).set_scan_window(90);
+          } else {
+            id(ble_tracker).set_scan_interval(320);
+            id(ble_tracker).set_scan_window(160);
+          }
+          id(ble_tracker).start_scan();
+    disabled_by_default: true
+#===========================================================================================================

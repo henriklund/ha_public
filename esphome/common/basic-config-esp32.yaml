@@ -1,0 +1,27 @@
+packages:
+  basic_config: !include basic-config.yaml
+
+esphome:
+  includes:
+    - <esp_wifi.h>
+
+sensor:
+  - platform: internal_temperature
+    name: "${friendly_name} controller - internal Temp"
+    id: ${shortname}_internal_temp
+    entity_category: diagnostic
+    disabled_by_default: false
+
+  - platform: template
+    id: ${shortname}_wifi_channel_sensor
+    name: "${friendly_name} controller - Wi-Fi Channel"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 60s
+    lambda: |-
+      wifi_ap_record_t ap_info;
+      if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
+        return (float) ap_info.primary;
+      }
+      return NAN;
+    disabled_by_default: false

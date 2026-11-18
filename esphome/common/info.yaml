@@ -1,0 +1,5 @@
+logger:
+  level: INFO
+
+debug:
+  update_interval: 5s

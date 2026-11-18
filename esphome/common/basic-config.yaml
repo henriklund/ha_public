@@ -1,0 +1,106 @@
+substitutions:
+  shortname: ""
+
+esphome:
+  name: ${name}
+  name_add_mac_suffix: false
+  friendly_name: ${friendly_name}
+  #includes:
+  #  - <esp_wifi.h>
+
+mdns:
+
+# GPIO15 = USER LED (yellow) — solid ON when API connected, blinks when not
+#status_led:
+#  pin:
+#    number: GPIO15
+
+binary_sensor:
+#===== System =====
+  - platform: status
+    name: ${friendly_name} controller - status
+
+sensor:
+  - platform: uptime
+    name: "${friendly_name} controller - uptime"
+    id: ${shortname}_controller_uptime
+    unit_of_measurement: "h"
+    accuracy_decimals: 2
+    update_interval: 60s
+    filters:
+      - lambda: return x / 3600.0;
+    entity_category: diagnostic
+    disabled_by_default: false
+
+  # - platform: wifi_signal
+  #   id: ${shortname}_wifi_signal_dbm
+  #   name: "${friendly_name} controller - Wi-Fi RSSI"
+  #   update_interval: 10s
+  #   entity_category: diagnostic
+  #   disabled_by_default: false
+
+  - platform: template
+    id: ${shortname}_wifi_disconnects_since_boot_sensor
+    name: "${friendly_name} controller - Wi-Fi Disconnects (since boot)"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 30s
+    lambda: |-
+      return id(${shortname}_wifi_disconnects_since_boot);
+    disabled_by_default: false
+
+  # - platform: template
+  #   id: ${shortname}_wifi_channel_sensor
+  #   name: "${friendly_name} controller - Wi-Fi Channel"
+  #   entity_category: diagnostic
+  #   accuracy_decimals: 0
+  #   update_interval: 60s
+  #   lambda: |-
+  #    wifi_ap_record_t ap_info;
+  #    if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
+  #      return (float) ap_info.primary;
+  #    }
+  #    return NAN;
+  #   disabled_by_default: false
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${friendly_name} controller - WiFi IP"
+      entity_category: diagnostic
+    mac_address:
+      name: "${friendly_name} controller - WiFi MAC"
+      entity_category: diagnostic
+    ssid:
+      name: "${friendly_name} controller - WiFi SSID"
+      entity_category: diagnostic
+    bssid:
+      name: "${friendly_name} controller - WiFi BSSID"
+      entity_category: diagnostic
+
+switch:
+  - platform: restart
+    id: ${shortname}_restart_btn
+    name: "${friendly_name} controller - Restart Device"
+    disabled_by_default: false
+
+  - platform: safe_mode
+    id: ${shortname}_button_safe_mode
+    name: "${friendly_name} controller - Safe Mode Boot"
+    disabled_by_default: true
+
+  - platform: factory_reset
+    id: ${shortname}_factory_reset_btn
+    name: "${friendly_name} controller - Factory reset"
+    disabled_by_default: true
+
+  - platform: shutdown
+    id: ${shortname}_shutdown_btn
+    name: "${friendly_name} controller - Shutdown"
+    disabled_by_default: true
+
+globals:
+  - id: ${shortname}_wifi_disconnects_since_boot
+    type: int
+    restore_value: no
+    initial_value: '0'

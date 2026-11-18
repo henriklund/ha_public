@@ -1,0 +1,21 @@
+packages:
+  basic_config: !include basic-config.yaml
+
+esphome:
+  includes:
+    - <user_interface.h>
+
+sensor:
+  - platform: template
+    id: ${shortname}_wifi_channel_sensor
+    name: "${friendly_name} controller - Wi-Fi Channel"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 60s
+    lambda: |-
+      uint8_t channel = wifi_get_channel();
+      if (channel > 0) {
+        return (float) channel;
+      }
+      return NAN;
+    disabled_by_default: false

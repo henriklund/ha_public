@@ -1,0 +1,43 @@
+substitutions:
+  status_led_pin: GPIO26
+  shortname: ""
+
+esp32:
+  variant: esp32
+  framework:
+    type: esp-idf
+    advanced:
+      minimum_chip_revision: 3.1
+      sram1_as_iram: true
+      flash_chip: generic
+
+esphome:
+  min_version: 2025.8.0
+  name_add_mac_suffix: false
+
+#logger:
+#  level: DEBUG
+
+api:
+  reboot_timeout: 15min
+
+wifi:
+  domain: .local
+  on_disconnect:
+    then:
+      - lambda: |-
+          id(${shortname}_wifi_disconnects_since_boot)++;
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+light:
+#===== System =====
+  - platform: status_led
+    name: ${friendly_name} controller - status LED
+    id: device_board_status_led
+    pin:
+      number: ${status_led_pin}
+    restore_mode: RESTORE_DEFAULT_OFF
+    entity_category: diagnostic

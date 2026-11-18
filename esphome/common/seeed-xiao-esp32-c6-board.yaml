@@ -1,0 +1,79 @@
+# https://wiki.seeedstudio.com/xiao_esp32c6_getting_started/
+substitutions:
+  status_led_pin: GPIO15
+  shortname: ""
+
+esp32:
+  board: seeed_xiao_esp32c6
+  variant: ESP32C6
+#  flash_size: 4MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_SOC_WIFI_HE_SUPPORT: "y"
+      CONFIG_ESP_WIFI_11AX_SUPPORT: "y"
+
+esphome:
+  on_boot:
+    - priority: -10
+      then:
+        - output.turn_off: rf_switch_enable     # LOW -> RF switch power ON
+        # - output.turn_on: rf_antenna_select   # HIGH -> external antenna (U.FL)
+        - output.turn_off: rf_antenna_select    # LOW -> internal antenna (PCB/RF1)
+
+api:
+  reboot_timeout: 15min
+
+wifi:
+  domain: .local
+  power_save_mode: NONE
+  fast_connect: true
+  enable_on_boot: true
+  reboot_timeout: 10min
+  enable_btm: true  # 802.11v BSS Transition Management (AP-coordinated roaming)
+  enable_rrm: true  # 802.11k Radio Resource Management (neighbor-assisted scanning)
+  #ap:
+  #  ap_timeout: 120s
+  on_connect:
+    then:
+      - component.update: ${shortname}_wifi_channel_sensor
+  on_disconnect:
+    then:
+      - lambda: |-
+          id(${shortname}_wifi_disconnects_since_boot)++;
+
+# External antenna control using ESPHome board aliases (FM8625H RF switch)
+# RF_SWITCH_EN (GPIO3) = RF switch power, RF_ANT_SELECT (GPIO14) = antenna selector
+output:
+  - platform: gpio
+    id: rf_switch_enable
+    pin: RF_SWITCH_EN
+
+  - platform: gpio
+    id: rf_antenna_select
+    pin: RF_ANT_SELECT
+
+switch:
+  - platform: template
+    name: "${friendly_name} controller - External Antenna"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - output.turn_off: rf_switch_enable    # LOW -> RF switch power ON
+      - output.turn_on: rf_antenna_select    # HIGH -> external antenna (U.FL/RF2)
+    turn_off_action:
+      - output.turn_off: rf_switch_enable    # LOW -> RF switch power ON
+      - output.turn_off: rf_antenna_select   # LOW -> internal antenna (PCB/RF1)
+    disabled_by_default: true
+
+light:
+#===== System =====
+  - platform: status_led
+    name: ${friendly_name} controller - status LED
+    id: device_board_status_led
+    pin:
+      number: ${status_led_pin}
+      inverted: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    
+    entity_category: diagnostic

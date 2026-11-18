@@ -1,0 +1,1031 @@
+sensor:
+# -----------------------------------------------------------------------------
+# System Info (1 -> 1999)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: hardware_version
+    name: "${model} - Hardware Version"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 77
+    #1-based address: 78
+    value_type: U_WORD
+    entity_category: diagnostic
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: modbus_message_ok_count
+    name: "${model} - Modbus Messages OK Count"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 499
+    #1-based address: 500
+    value_type: U_DWORD
+    entity_category: diagnostic
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: modbus_message_nok_count
+    name: "${model} - Modbus Messages NOK Count"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 501
+    #1-based address: 502
+    value_type: U_DWORD
+    entity_category: diagnostic
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: runtime_total
+    name: "${model} - Runtime - Total"
+    modbus_controller_id: ${modbus_ctrl_id}_60
+    address: 509
+    #1-based address: 510
+    value_type: U_DWORD
+    entity_category: diagnostic
+    register_type: read
+    on_value:
+      then:
+        - text_sensor.template.publish:
+            id: runtime_total_human
+            state: !lambda |-
+              return format_runtime((uint32_t) x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: runtime_application
+    name: "${model} - Runtime - Application"
+    modbus_controller_id: ${modbus_ctrl_id}_60
+    address: 511
+    #1-based address: 512
+    value_type: U_DWORD
+    unit_of_measurement: s
+    entity_category: diagnostic
+    register_type: read
+    on_value:
+      then:
+        - text_sensor.template.publish:
+            id: runtime_application_human
+            state: !lambda |-
+              return format_runtime((uint32_t) x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: emergency_mode_running_time
+    name: "${model} - Emergency Mode Running Time"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 550
+    #1-based address: 551
+    value_type: U_DWORD
+    unit_of_measurement: s
+    entity_category: diagnostic
+    register_type: read
+    on_value:
+      then:
+        - text_sensor.template.publish:
+            id: emergency_mode_running_time_human
+            state: !lambda |-
+              return format_runtime((uint32_t) x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    # Treat this as readonly. "holding_registers_readwrite" will handle any writes
+    id: time_utc_value
+    name: "${model} - Time UTC Value"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 621
+    #1-based address: 622
+    value_type: U_DWORD
+    entity_category: diagnostic
+    register_type: holding
+    accuracy_decimals: 0
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: time_local_time_epoch
+    name: "${model} - Time Local Time (epoch)"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 623
+    #1-based address: 624
+    value_type: U_DWORD
+    entity_category: diagnostic
+    register_type: read
+    accuracy_decimals: 0
+    disabled_by_default: true
+
+
+# -----------------------------------------------------------------------------
+# Inputs (4000 -> 5999)
+# -----------------------------------------------------------------------------
+# Core temperature sensors (S1–S6)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    # appears to be almost identical  to "Circuit 1 - Heat Sensors - Outside Temperature" (15-20min behind)
+    id: sensor_s1_temperature
+    name: "Inputs - Sensor S1 temperature"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 3999
+    #1-based address: 4000
+    value_type: FP32
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    register_type: read
+  - platform: modbus_controller
+    id: input_4008
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4008
+    #1-based address: 4009
+    value_type: U_WORD
+    register_type: read
+    on_value:
+      then:
+        lambda: |- 
+          id(sensor_s1_temperature_status).publish_state(sensor_temperature_status(static_cast<int>(x)));
+    internal: true
+  - platform: modbus_controller
+    id: sensor_s2_temperature
+    name: "Inputs - Sensor S2 temperature"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4009
+    #1-based address: 4010
+    value_type: FP32
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    register_type: read
+  - platform: modbus_controller
+    id: input_4018
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4018
+    #1-based address: 4019
+    value_type: U_WORD
+    register_type: read
+    on_value:
+      then:
+        lambda: |- 
+          id(sensor_s2_temperature_status).publish_state(sensor_temperature_status(static_cast<int>(x)));
+    internal: true
+  - platform: modbus_controller
+    # appears to be identical to "Circuit 1 - Heat Sensors - Heat Flow Temperature"
+    id: sensor_s3_temperature
+    name: "Inputs - Sensor S3 temperature"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4019
+    #1-based address: 4020
+    value_type: FP32
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    register_type: read
+  - platform: modbus_controller
+    id: input_4028
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4028
+    #1-based address: 4029
+    value_type: U_WORD
+    register_type: read
+    on_value:
+      then:
+        lambda: |- 
+          id(sensor_s3_temperature_status).publish_state(sensor_temperature_status(static_cast<int>(x)));
+    internal: true
+  - platform: modbus_controller
+    # see also "Circuit 1 - Heat Sensors - Return Temperature"
+    id: sensor_s4_temperature
+    name: "Inputs - Sensor S4 temperature"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4029
+    #1-based address: 4030
+    value_type: FP32
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    register_type: read
+  - platform: modbus_controller
+    id: input_4038
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4038
+    #1-based address: 4039
+    value_type: U_WORD
+    register_type: read
+    on_value:
+      then:
+        lambda: |- 
+          id(sensor_s4_temperature_status).publish_state(sensor_temperature_status(static_cast<int>(x)));
+    internal: true
+  - platform: modbus_controller
+    id: sensor_s5_temperature
+    name: "Inputs - Sensor S5 temperature"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4039
+    #1-based address: 4040
+    value_type: FP32
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    register_type: read
+  - platform: modbus_controller
+    id: input_4048
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4048
+    #1-based address: 4049
+    value_type: U_WORD
+    register_type: read
+    on_value:
+      then:
+        lambda: |- 
+          id(sensor_s5_temperature_status).publish_state(sensor_temperature_status(static_cast<int>(x)));
+    internal: true
+  - platform: modbus_controller
+    id: sensor_s6_temperature
+    name: "Inputs - Sensor S6 temperature"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4049
+    #1-based address: 4050
+    value_type: FP32
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    register_type: read
+  - platform: modbus_controller
+    id: input_4058
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4058
+    #1-based address: 4059
+    value_type: U_WORD
+    register_type: read
+    on_value:
+      then:
+        lambda: |- 
+          id(sensor_s6_temperature_status).publish_state(sensor_temperature_status(static_cast<int>(x)));
+    internal: true
+  - platform: modbus_controller
+    id: flow_sensor_1
+    name: "Inputs - Flow Sensor 1"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 4059
+    #1-based address: 4060
+    value_type: FP32
+    unit_of_measurement: Hz
+    accuracy_decimals: 2
+    device_class: frequency
+    state_class: measurement
+    register_type: read
+    disabled_by_default: true
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat Sensors (21100 -> 21199)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    # See also "Inputs - Sensor S4 temperature"
+    id: circuit1_heat_flow_temperature
+    name: "Circuit 1 - Heat Sensors - Heat Flow Temperature"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21099
+    #1-based address: 21100
+    value_type: FP32
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    # See also "Inputs - Sensor S1 temperature"
+    id: circuit1_outside_temperature
+    name: "Circuit 1 - Heat Sensors - Outside Temperature"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21101
+    #1-based address: 21102
+    value_type: FP32
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    register_type: read
+  - platform: modbus_controller
+    # See also "Inputs - Sensor S4 temperature"
+    id: circuit1_return_temperature
+    name: "Circuit 1 - Heat Sensors - Return Temperature"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21103
+    #1-based address: 21104
+    value_type: FP32
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_room_temperature
+    name: "Circuit 1 - Heat Sensors - Room Temperature"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21105
+    #1-based address: 21106
+    value_type: FP32
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_supply_temperature
+    name: "Circuit 1 - Heat Sensors - Supply Temperature"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21107
+    #1-based address: 21108
+    value_type: FP32
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    register_type: read
+    disabled_by_default: true
+# Does not appear valid for an A130/ECL-120
+#  - platform: modbus_controller
+#   id: dhw_temperature
+#    name: "Circuit 1 - Heat Sensors - DHW Temperature"
+#    modbus_controller_id: ${modbus_ctrl_id}_15
+#    address: 21109
+#    #1-based address: 21110
+#    value_type: FP32
+#    unit_of_measurement: °C
+#    accuracy_decimals: 2
+#    device_class: temperature
+#    state_class: measurement
+#    register_type: read
+
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat Status (21000 -> 21099 )
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: input_21001
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21000
+    #1-based address: 21001
+    register_type: input
+    value_type: U_WORD
+    on_value:
+      then:
+        lambda: |- 
+          switch (static_cast<int>(x)) {
+            case 0:
+              id(circuit1_operation_status).publish_state("Comfort");
+              break;
+            case 1:
+              id(circuit1_operation_status).publish_state("Saving");
+              break;
+            case 2:
+              id(circuit1_operation_status).publish_state("Frost protection");
+              break;
+            default:
+              id(circuit1_operation_status).publish_state("Unknown");
+          }
+    internal: true
+  - platform: modbus_controller
+    id: circuit1_heat_demand_status
+    name: "Circuit 1 - Heat Status - Heat Demand Status"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21001
+    #1-based address: 21002
+    value_type: U_WORD
+    register_type: read
+    #icon: "mdi:timer-outline"
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_boost_remaining_time
+    name: "Circuit 1 - Heat Status - Boost remaining time"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21003
+    #1-based address: 21004
+    value_type: FP32
+    unit_of_measurement: "s"
+    register_type: read
+    icon: "mdi:timer-outline"
+    disabled_by_default: true
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat Outputs (21100 -> 21199)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: circuit1_heat_valve_position
+    name: "Circuit 1 - Heat Outputs - Heat Valve Position"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21699
+    #1-based address: 21700
+    value_type: FP32
+    unit_of_measurement: "%"
+    state_class: measurement
+    icon: "mdi:valve"
+    register_type: read
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat References (21200 -> 21299)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: circuit1_heat_flow_reference
+    name: "Circuit 1 - Heat References - Heat Flow Temperature Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21199
+    #1-based address: 21200
+    value_type: FP32
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    register_type: read
+  - platform: modbus_controller
+    id: circuit1_heat_weather_comp_reference
+    name: "Circuit 1 - Heat References - Heat Weather Compensated Reference"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21205
+    #1-based address: 21206
+    value_type: FP32
+    unit_of_measurement: °C
+    accuracy_decimals: 2
+    device_class: temperature
+    state_class: measurement
+    register_type: read
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat Settings (21400 -> 21499)
+# -----------------------------------------------------------------------------
+# These are holding registers. However, prefer to keep them as readonly
+  - platform: modbus_controller
+    id: circuit1_motor_speed
+    name: "Circuit 1 - Motor Speed"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21448
+    #1-based address: 21449
+    value_type: U_WORD
+    #min_value: 0
+    #max_value: 65535
+    #step: 1
+    unit_of_measurement: "s/mm"
+    register_type: holding
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_valve_spindle
+    name: "Circuit 1 - Valve Spindle"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21449
+    #1-based address: 21450
+    value_type: FP32
+    filters:
+      - multiply: 0.01
+    accuracy_decimals: 2
+    #min_value: 0
+    #max_value: 0.05
+    #step: 0.001
+    unit_of_measurement: "m"
+    register_type: holding
+    disabled_by_default: true
+
+
+binary_sensor:
+# -----------------------------------------------------------------------------
+# System Info (1 -> 1999)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: emergency_mode_status
+    name: "${model} - Emergency Mode Status"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 549
+    #1-based address: 550
+    bitmask: 1
+    entity_category: diagnostic
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: time_valid
+    name: "${model} - Time Valid"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 619
+    #1-based address: 620
+    bitmask: 1
+    entity_category: diagnostic
+    register_type: read
+    disabled_by_default: true
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat Status (21000 -> 21099 )
+# -----------------------------------------------------------------------------
+# Does not appear valid for an A130/ECL-120
+#  - platform: modbus_controller
+#    id: circuit1_dhw_bypass_active
+#    name: "Circuit 1 - Heat Status - DHW Bypass Active"
+#    modbus_controller_id: ${modbus_ctrl_id}_15
+#    address: 21006
+#    #1-based address: 21007
+#    bitmask: 1
+#    register_type: read
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat Outputs (21100 -> 21199)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: circuit1_heat_pump_state
+    name: "Circuit 1 - Heat Outputs - Heat Pump State"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21701
+    #1-based address: 21702
+    bitmask: 1
+    icon: "mdi:pump"
+    register_type: read
+    disabled_by_default: true
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat Alarms (21300 -> 21399)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: circuit1_heat_alarm_missing
+    name: "Circuit 1 - Heat Alarms - Heat Alarm Sensor Missing"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21299
+    #1-based address: 21300
+    register_type: read
+    bitmask: 1
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: circuit1_heat_alarm_reference_not_reached
+    name: "Circuit 1 - Heat Alarms - Heat Alarm Reference Not Reached"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 21300
+    #1-based address: 21301
+    register_type: read
+    bitmask: 1
+    disabled_by_default: true
+
+    
+text_sensor:
+# -----------------------------------------------------------------------------
+# System Info (1 -> 1999)
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: product_serial_number
+    name: "${model} - Product Serial Number"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 0
+    #1-based address: 1
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 16
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: product_model_name
+    name: "${model} - Product Model Name"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 10
+    #1-based address: 11
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 16
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: firmware_version
+    name: "${model} - Firmware Version"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 20
+    #1-based address: 21
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 16
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: software_version
+    name: "${model} - Software Version"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 29
+    #1-based address: 30
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 16
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: software_application_name
+    name: "${model} - Software Application Name"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    # Use this to look up use of modbus. Eg. A130 -> Documentation sect. 3.4
+    address: 39
+    #1-based address: 40
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 16
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: firmware_code_number
+    name: "${model} - Firmware Code Number"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 49
+    #1-based address: 50
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 16
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: software_code_number
+    name: "${model} - Software Code Number"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 59
+    #1-based address: 60
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 16
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: hardware_code_number
+    name: "${model} - Hardware Code Number"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 69
+    #1-based address: 70
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 16
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: product_code_name
+    name: "${model} - Product Code Name"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 79
+    #1-based address: 80
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 16
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: manufacturer_name
+    name: "${model} - Manufacturer Name"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 89
+    #1-based address: 90
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 16
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: station_manufacturer_name
+    name: "${model} - Station Manufacturer Name"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 139
+    #1-based address: 140
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 64
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: station_description
+    name: "${model} - Station Description"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 179
+    #1-based address: 180
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 64
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: station_serial_number
+    name: "${model} - Station Serial Number"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 219
+    #1-based address: 220
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 16
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: station_product_code_number
+    name: "${model} - Station Product Code Number"
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    address: 229
+    #1-based address: 230
+    raw_encode: NONE
+    entity_category: diagnostic
+    response_size: 16
+    register_type: read
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: current_local_time
+    name: "${model} - Current Local Time"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 599
+    #1-based address: 600
+    raw_encode: NONE
+    response_size: 16
+    register_type: read
+    entity_category: diagnostic
+    disabled_by_default: true
+  - platform: modbus_controller
+    id: current_local_date
+    name: "${model} - Current Local Date"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 609
+    #1-based address: 610
+    raw_encode: NONE
+    register_type: read
+    response_size: 16
+    entity_category: diagnostic
+    disabled_by_default: true
+
+
+# -----------------------------------------------------------------------------
+# System Settings (2000 -> 3999 )
+# -----------------------------------------------------------------------------
+# 2000 / 2002 / 2003 are omitted by intention. Changing these may render the ECL120
+# unreachable
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    id: ethernet_ip_address
+    name: "${model} - Ethernet IP address"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 2099
+    #1-based address: 2100
+    register_type: read
+    response_size: 16
+    raw_encode: ANSI
+    entity_category: diagnostic
+    lambda: |-
+      std::string result;
+      for (size_t i = 0; i < x.length() && i < 16; i++) {
+        result += x[i];
+      }
+      return result;
+    icon: "mdi:ip-network"
+  - platform: modbus_controller
+    id: ethernet_mac_address
+    name: "${model} - Ethernet MAC address"
+    modbus_controller_id: ${modbus_ctrl_id}_15
+    address: 2109
+    #1-based address: 2110
+    register_type: read
+    response_size: 32
+    raw_encode: ANSI
+    entity_category: diagnostic
+    lambda: |-
+      std::string result;
+      for (size_t i = 0; i < x.length() && i < 32; i++) {
+        result += x[i];
+      }
+      return result;
+    icon: "mdi:lan"
+
+
+# -----------------------------------------------------------------------------
+# Extra diagnostics / info
+# -----------------------------------------------------------------------------
+# Circuit 1 - A130 - Heat Status (21000 -> 21099)
+# -----------------------------------------------------------------------------
+  - platform: template
+    id: circuit1_operation_status
+    name: "Circuit 1 - Heat Status - Operation Status"
+    icon: "mdi:auto-mode"
+
+
+# -----------------------------------------------------------------------------
+# Inputs (4000 -> 5999)
+# -----------------------------------------------------------------------------
+  - platform: template
+    id: sensor_s1_temperature_status
+    name: "Inputs - Sensor S1 temperature - status"
+    icon: mdi:view-grid-plus
+    disabled_by_default: true
+  - platform: template
+    id: sensor_s2_temperature_status
+    name: "Inputs - Sensor S2 temperature - status"
+    icon: mdi:view-grid-plus
+    disabled_by_default: true
+  - platform: template
+    id: sensor_s3_temperature_status
+    name: "Inputs - Sensor S3 temperature - status"
+    icon: mdi:view-grid-plus
+    disabled_by_default: true
+  - platform: template
+    id: sensor_s4_temperature_status
+    name: "Inputs - Sensor S4 temperature - status"
+    icon: mdi:view-grid-plus
+    disabled_by_default: true
+  - platform: template
+    id: sensor_s5_temperature_status
+    name: "Inputs - Sensor S5 temperature - status"
+    icon: mdi:view-grid-plus
+    disabled_by_default: true
+  - platform: template
+    id: sensor_s6_temperature_status
+    name: "Inputs - Sensor S6 temperature - status"
+    icon: mdi:view-grid-plus
+    disabled_by_default: true
+  - platform: template
+    id: runtime_total_human
+    name: "${model} - Runtime - Total - Human"
+    icon: mdi:clock
+    entity_category: diagnostic
+    disabled_by_default: true
+  - platform: template
+    id: runtime_application_human
+    name: "${model} - Runtime - Application - Human"
+    icon: mdi:clock
+    entity_category: diagnostic
+    disabled_by_default: true
+  - platform: template
+    id: emergency_mode_running_time_human
+    name: "${model} - Emergency Mode Running Time - Human"
+    icon: mdi:clock
+    entity_category: diagnostic
+    disabled_by_default: true
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 – Heating Week Schedule (21800 -> 21999 )
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Heating - Day 1"
+    id: weekly_schedule_heating_day1
+    register_type: holding
+    address: 21799
+    #1-based address: 21800
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Heating - Day 2"
+    id: weekly_schedule_heating_day2
+    register_type: holding
+    address: 21819
+    #1-based address: 21820
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Heating - Day 3"
+    id: weekly_schedule_heating_day3
+    register_type: holding
+    address: 21839
+    #1-based address: 21840
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Heating - Day 4"
+    id: weekly_schedule_heating_day4
+    register_type: holding
+    address: 21859
+    #1-based address: 21860
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Heating - Day 5"
+    id: weekly_schedule_heating_day5
+    register_type: holding
+    address: 21879
+    #1-based address: 21880
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Heating - Day 6"
+    id: weekly_schedule_heating_day6
+    register_type: holding
+    address: 21899
+    #1-based address: 21900
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Heating - Day 7"
+    id: weekly_schedule_heating_day7
+    register_type: holding
+    address: 21919
+    #1-based address: 21920
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true
+
+
+# -----------------------------------------------------------------------------
+# Circuit 1 – Bypass Week Schedule (31800 -> 31999 )
+# -----------------------------------------------------------------------------
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Bypass - Day 1"
+    id: weekly_schedule_bypass_day1
+    register_type: holding
+    address: 31799
+    #1-based address: 31800
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Bypass - Day 2"
+    id: weekly_schedule_bypass_day2
+    register_type: holding
+    address: 31819
+    #1-based address: 31820
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Bypass - Day 3"
+    id: weekly_schedule_bypass_day3
+    register_type: holding
+    address: 31839
+    #1-based address: 31840
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Bypass - Day 4"
+    id: weekly_schedule_bypass_day4
+    register_type: holding
+    address: 31859
+    #1-based address: 31860
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Bypass - Day 5"
+    id: weekly_schedule_bypass_day5
+    register_type: holding
+    address: 31879
+    #1-based address: 31880
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Bypass - Day 6"
+    id: weekly_schedule_bypass_day6
+    register_type: holding
+    address: 31899
+    #1-based address: 31900
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true
+  - platform: modbus_controller
+    modbus_controller_id: ${modbus_ctrl_id}_300
+    name: "Weekly Schedule - Bypass - Day 7"
+    id: weekly_schedule_bypass_day7
+    register_type: holding
+    address: 31919
+    #1-based address: 31920
+    response_size: 24
+    raw_encode: HEXBYTES
+    lambda: |-
+      return format_schedule(x);
+    disabled_by_default: true

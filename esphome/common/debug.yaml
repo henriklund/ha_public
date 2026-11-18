@@ -1,0 +1,14 @@
+logger:
+  level: DEBUG
+
+debug:
+  update_interval: 5s
+
+sensor:
+  - platform: debug
+    free:
+      name: ${friendly_name} controller - heap free
+    block:
+      name: ${friendly_name} controller - heap max block
+    loop_time:
+      name: ${friendly_name} controller - loop time
