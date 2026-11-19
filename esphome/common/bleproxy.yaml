@@ -6,7 +6,7 @@ esp32_ble_tracker:
     #active: true
     interval: 320ms
     #window: 90ms
-    window: 290ms # default 30ms. Time spent listening during interval.
+    window: 290ms # default 30ms. Time spent listening during interval.#===========================================================================================================
     continuous: true
 #===========================================================================================================
 

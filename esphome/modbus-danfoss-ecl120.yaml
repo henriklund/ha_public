@@ -1,4 +1,4 @@
-# https://www.espboards.dev/esp31/d1-mini32/
+# https://www.espboards.dev/esp32/d1-mini32/
 # https://github.com/nichlasrohde/ha-ecl-modbus/tree/main/custom_components/ecl_modbus
 #
 # IMPORTANT: ESPHome uses zero-based notation and not the 1-based notation from the Danfoss documentation !
@@ -46,15 +46,6 @@ esphome:
 api:
   encryption:
     key: !secret modbus_danfoss_ecl120__encryption_key
-#===========================================================================================================
-
-
-
-#===========================================================================================================
-ota:
-  - platform: esphome
-    encryption: 
-    #password: !secret modbus_danfoss_ecl120__ota_password
 #===========================================================================================================
 
 
