@@ -15,7 +15,7 @@ esp32_ble_tracker:
 #===========================================================================================================
 esp32_ble_beacon:
   type: iBeacon
-  uuid: f4e6570d-842e-4ec3-9ccc-eb1a5012751c
+  uuid: !secret esp32_ble_beacon_uuid
   major: 1
   minor: ${ip}
   min_interval: 500ms
