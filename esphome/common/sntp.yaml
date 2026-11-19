@@ -5,7 +5,7 @@ substitutions:
 time:
   - platform: sntp
     id: ${shortname}sntp_time
-    timezone: Europe/Copenhagen
+    timezone: !secret TimeZone
     servers: !secret server_sntp_time
     update_interval: 15s
 #===========================================================================================================
