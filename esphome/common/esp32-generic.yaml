@@ -28,10 +28,6 @@ wifi:
       - lambda: |-
           id(${shortname}_wifi_disconnects_since_boot)++;
 
-ota:
-  - platform: esphome
-    id: ota_esphome
-
 light:
 #===== System =====
   - platform: status_led
